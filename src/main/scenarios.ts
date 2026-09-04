@@ -63,3 +63,52 @@ function parseFrontmatter(block: string): Record<string, string> {
   }
   return out
 }
+
+/** A scenario as the reviewer should read it, rubric and all. */
+export interface ScenarioSource {
+  id: string
+  title: string
+  difficulty: number
+  /** Canonical brief plus rubric, with every localized copy removed. */
+  text: string
+}
+
+/**
+ * The one place the rubric is deliberately handed out.
+ *
+ * It never crosses to the renderer — this is read in the main process and goes
+ * straight into a prompt, so that fast mode does not have to spend a round trip
+ * asking the model to open a file the app already has.
+ *
+ * The localized briefs are stripped rather than substituted: they say the same
+ * thing as the canonical one, and paying prompt tokens to state the
+ * requirements twice is exactly what fast mode exists to stop. The reviewer
+ * reads English and answers in the interface language.
+ */
+export async function readScenarioSource(
+  root: string,
+  id: string,
+): Promise<ScenarioSource | null> {
+  let raw: string
+  try {
+    raw = (await readFile(join(root, 'scenarios', `${id}.md`), 'utf-8')).replace(/\r\n/g, '\n')
+  } catch {
+    return null
+  }
+
+  const frontmatter = /^---\n([\s\S]*?)\n---\n/.exec(raw)
+  const meta = frontmatter ? parseFrontmatter(frontmatter[1]!) : {}
+  const text = (frontmatter ? raw.slice(frontmatter[0].length) : raw)
+    .replace(BRIEF_BLOCK, '')
+    // The markers are scaffolding for the stripping above; the rubric itself
+    // stays, and reads better without an HTML comment wrapped round it.
+    .replace(/<!--\s*RUBRIC:(?:START|END)[^>]*-->/g, '')
+    .trim()
+
+  return {
+    id: meta.id ?? id,
+    title: meta.title ?? id,
+    difficulty: Number(meta.difficulty ?? 1),
+    text,
+  }
+}

@@ -78,6 +78,8 @@ function Canvas() {
   /** The diagram as it was before the last applied fix, for a single undo. */
   const [beforeFix, setBeforeFix] = useState<Diagram | null>(null)
   const [hasVoiceKey, setHasVoiceKey] = useState(false)
+  /** Mirrors the preference main holds; main is the one that decides. */
+  const [fast, setFast] = useState(false)
   const [keyDraft, setKeyDraft] = useState('')
   const [dirty, setDirty] = useState(false)
   const wrapper = useRef<HTMLDivElement>(null)
@@ -471,7 +473,15 @@ function Canvas() {
 
   useEffect(() => {
     void window.kaze.hasVoiceKey().then(setHasVoiceKey)
+    void window.kaze.getFastMode().then(setFast)
   }, [])
+
+  const toggleFast = useCallback(() => {
+    const next = !fast
+    setFast(next)
+    void window.kaze.setFastMode(next)
+    setStatus(next ? t.fastModeOn : t.fastModeOff)
+  }, [fast, t])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -639,6 +649,20 @@ function Canvas() {
         </button>
         <button className="btn btn--ghost" onClick={() => void runTurn('review')} disabled={streaming}>
           {streaming ? t.reviewing : t.review}
+        </button>
+        {/* Next to the button it changes the meaning of, not filed away in a
+            menu: it is worth seeing which kind of review you are about to get
+            at the moment you ask for one. */}
+        <button
+          className={`btn btn--ghost fasttoggle${fast ? ' fasttoggle--on' : ''}`}
+          onClick={toggleFast}
+          aria-pressed={fast}
+          title={t.fastModeHint}
+        >
+          <svg viewBox="0 0 24 24" className="fasttoggle__bolt" aria-hidden focusable="false">
+            <path d="M13 2 4.5 13.5H11l-1 8.5L19.5 10H13l1-8Z" />
+          </svg>
+          {t.fastMode}
         </button>
         {speech.available && (
           <button className="btn btn--ghost" onClick={() => (speech.playing ? speech.stop() : speech.play())}>

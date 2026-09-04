@@ -127,6 +127,10 @@ export interface Dict {
   review: string
   reviewing: string
   thinking: string
+  fastMode: string
+  fastModeHint: string
+  fastModeOn: string
+  fastModeOff: string
   stop: string
   replay: string
   stopPlayback: string
@@ -279,6 +283,11 @@ const es: Dict = {
   review: 'Revisar',
   reviewing: 'Revisando…',
   thinking: 'Pensando…',
+  fastMode: 'Rápido',
+  fastModeHint:
+    'Modo rápido: la revisión llega en una sola vuelta, sin abrir archivos ni consultar la documentación de AWS. Menos hallazgos y sin ids de best practice, pero mucho antes.',
+  fastModeOn: 'Modo rápido activado — una vuelta, sin herramientas, hasta tres hallazgos.',
+  fastModeOff: 'Modo rápido desactivado — vuelve la revisión completa.',
   stop: 'Detener',
   replay: 'Repetir',
   stopPlayback: 'Detener audio',
@@ -542,6 +551,11 @@ const en: Dict = {
   review: 'Review',
   reviewing: 'Reviewing…',
   thinking: 'Thinking…',
+  fastMode: 'Fast',
+  fastModeHint:
+    'Fast mode: the review comes back in a single round trip, with no files opened and no AWS documentation consulted. Fewer findings and no best-practice ids, but far sooner.',
+  fastModeOn: 'Fast mode on — one round trip, no tools, up to three findings.',
+  fastModeOff: 'Fast mode off — the full review is back.',
   stop: 'Stop',
   replay: 'Replay',
   stopPlayback: 'Stop audio',

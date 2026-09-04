@@ -1,5 +1,6 @@
 import type { Options, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import { resolveInstalledClaude } from './resolve-claude'
+import { FAST_MODEL } from './fast-review'
 import type { ReviewEvent, TurnIntent } from '../shared/types'
 
 /**
@@ -46,6 +47,31 @@ const DISALLOWED = [
   'TaskOutput', 'TaskStop', 'DesignSync', 'ReportFindings', 'AskUserQuestion',
 ]
 
+/**
+ * A fast turn offers no tools whatsoever, so everything the full profile allows
+ * is named here alongside the hard denies, plus the handful the CLI hands over
+ * without being asked. Nothing here is a judgement call: the prompt already
+ * carries every file the reviewer would have opened, and a tool call is a round
+ * trip that fast mode exists to avoid.
+ */
+const FAST_DISALLOWED = [
+  ...DISALLOWED,
+  ...ALLOWED,
+  'TodoWrite', 'SlashCommand', 'BashOutput', 'KillShell', 'Artifact',
+]
+
+/**
+ * Passing this to `send` selects the fast profile. It is the whole switch: a
+ * turn either has a system prompt of its own, no tools and its own short-lived
+ * conversation, or it is an ordinary one.
+ */
+export interface FastTurn {
+  /** Replaces the Claude Code preset outright. */
+  system: string
+  /** Start the fast conversation over. A review is a fresh judgement. */
+  fresh?: boolean
+}
+
 export interface SessionManagerOptions {
   cwd: string
   /** Override the CLI to drive. Defaults to the one on the user's PATH. */
@@ -58,6 +84,14 @@ export interface SessionManagerOptions {
 
 export class SessionManager {
   private sessionId: string | null = null
+  /**
+   * Fast turns run in their own conversation, kept apart from the attempt's.
+   * Mixing them would put a toolless, system-prompt-replaced turn in the middle
+   * of the transcript the slow reviewer resumes, and it is never written to
+   * disk: it is worth continuing across a couple of follow-up questions, and
+   * worth nothing after a restart.
+   */
+  private fastSessionId: string | null = null
   private abort: AbortController | null = null
   private readonly cwd: string
   private readonly emit: (event: ReviewEvent) => void
@@ -90,6 +124,7 @@ export class SessionManager {
   reset(): void {
     this.cancel()
     this.sessionId = null
+    this.fastSessionId = null
   }
 
   /** Continue a conversation from a previous run of the app. */
@@ -98,7 +133,6 @@ export class SessionManager {
   }
 
   private options(): Options {
-    const denied: string[] = []
     const base: Options = {
       cwd: this.cwd,
       settingSources: ['project'],
@@ -111,7 +145,6 @@ export class SessionManager {
         if (ALLOWED.includes(toolName) || toolName.startsWith(ALLOWED_MCP_PREFIX)) {
           return { behavior: 'allow', updatedInput: input }
         }
-        denied.push(toolName)
         return { behavior: 'deny', message: `kaze: ${toolName} is not on the reviewer's allowlist` }
       },
     }
@@ -126,23 +159,65 @@ export class SessionManager {
   }
 
   /**
+   * The lean profile. Every line here removes something that costs time before
+   * the first word of the review:
+   *
+   *   - `settingSources: []` — no project settings, so no skill to open and no
+   *     MCP server to connect. The skill's rules are in the system prompt.
+   *   - `systemPrompt: custom` — the Claude Code preset is written for an agent
+   *     with a filesystem and twenty tools. This turn has neither.
+   *   - `thinking: disabled` and `effort: 'low'` — a review of five boxes
+   *     against a brief that is quoted in full does not need to be reasoned out
+   *     first, and thinking is pure latency you watch happen.
+   *   - `maxTurns: 1` — there is nothing to do but answer, so a second turn
+   *     could only be the model trying a tool it does not have.
+   *
+   * `canUseTool` stays as the deny-everything backstop it is in the full
+   * profile; `FAST_DISALLOWED` is the layer nothing overrides.
+   */
+  private fastOptions(system: string): Options {
+    const base: Options = {
+      cwd: this.cwd,
+      settingSources: [],
+      strictMcpConfig: true,
+      disallowedTools: FAST_DISALLOWED,
+      systemPrompt: { type: 'custom', prompt: system },
+      model: FAST_MODEL,
+      thinking: { type: 'disabled' },
+      effort: 'low',
+      maxTurns: 1,
+      permissionMode: 'default',
+      includePartialMessages: true,
+      canUseTool: async (toolName) => ({
+        behavior: 'deny',
+        message: `kaze: a fast turn has no tools; ${toolName} is unavailable`,
+      }),
+    }
+    if (this.claudePath) base.pathToClaudeCodeExecutable = this.claudePath
+    if (this.fastSessionId) base.resume = this.fastSessionId
+    return base
+  }
+
+  /**
    * Run one turn to completion. Resolves with the assistant's full text.
    * Throws only on a genuine failure; a cancelled turn resolves with what it
    * had, so a barge-in still leaves a readable transcript.
    */
-  async send(prompt: string, intent: TurnIntent): Promise<string> {
+  async send(prompt: string, intent: TurnIntent, fast?: FastTurn): Promise<string> {
     if (this.abort) throw new Error('a turn is already in flight')
     const abort = new AbortController()
     this.abort = abort
+    if (fast?.fresh) this.fastSessionId = null
 
     let text = ''
     this.emit({ kind: 'turn-start', intent })
 
     try {
       const query = await loadQuery()
-      for await (const message of query({ prompt, options: { ...this.options(), abortController: abort } })) {
+      const options = fast ? this.fastOptions(fast.system) : this.options()
+      for await (const message of query({ prompt, options: { ...options, abortController: abort } })) {
         if (abort.signal.aborted) break
-        this.consume(message, (chunk) => {
+        this.consume(message, Boolean(fast), (chunk) => {
           // Separate blocks are separate paragraphs. Concatenated flush, a
           // block that opens with a heading lands mid-line — "…the ledger.##
           // Revisión" — and markdown never sees a heading at all.
@@ -163,21 +238,31 @@ export class SessionManager {
     return text
   }
 
-  private consume(message: SDKMessage, appendText: (chunk: string) => void): void {
+  private consume(message: SDKMessage, fast: boolean, appendText: (chunk: string) => void): void {
     if (message.type === 'system' && message.subtype === 'init') {
-      this.sessionId = message.session_id
       const offered = message.tools ?? []
-      const unexpected = offered.filter(
-        (t) => !ALLOWED.includes(t) && !t.startsWith(ALLOWED_MCP_PREFIX),
-      )
       // The toolset is a security boundary and the defaults are wide. Say so
-      // loudly rather than discovering it in a transcript later.
+      // loudly rather than discovering it in a transcript later. A fast turn
+      // expects none at all, which also means this is the check that would
+      // notice the day fast mode stopped actually being toolless.
+      const unexpected = fast
+        ? offered
+        : offered.filter((t) => !ALLOWED.includes(t) && !t.startsWith(ALLOWED_MCP_PREFIX))
       if (unexpected.length > 0) {
         this.emit({
           kind: 'warning',
           message: `session offers unexpected tools: ${unexpected.join(', ')}`,
         })
       }
+
+      if (fast) {
+        // Not emitted: the caller persists this id as the attempt's
+        // conversation, and resuming a toolless turn as the full reviewer is
+        // exactly the kind of quiet mix-up that would be hard to see later.
+        this.fastSessionId = message.session_id
+        return
+      }
+      this.sessionId = message.session_id
       this.emit({ kind: 'session', sessionId: message.session_id })
       return
     }
@@ -199,7 +284,8 @@ export class SessionManager {
     }
 
     if (message.type === 'result') {
-      this.sessionId ??= message.session_id
+      if (fast) this.fastSessionId ??= message.session_id
+      else this.sessionId ??= message.session_id
       this.emit({
         kind: 'result',
         ok: message.subtype === 'success',

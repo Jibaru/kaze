@@ -18,6 +18,8 @@ const api: KazeApi = {
   cancelScenario: () => ipcRenderer.invoke('scenario:cancel'),
   getLocale: () => ipcRenderer.invoke('locale:get'),
   setLocale: (locale: Locale) => ipcRenderer.invoke('locale:set', locale),
+  getFastMode: () => ipcRenderer.invoke('mode:get-fast'),
+  setFastMode: (on: boolean) => ipcRenderer.invoke('mode:set-fast', on),
   review: (diagram: Diagram, intent: TurnIntent, question?: string) =>
     ipcRenderer.invoke('review:run', diagram, intent, question),
   cancelTurn: () => ipcRenderer.invoke('review:cancel'),

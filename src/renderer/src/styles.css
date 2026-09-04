@@ -1355,3 +1355,31 @@ button, input, select { font-family: inherit; font-size: inherit; color: inherit
 @keyframes toast-in {
   from { opacity: 0; transform: translate(-50%, 10px); }
 }
+
+/* ── fast mode toggle ─────────────────────────────────────────────────
+   A pressed state, not a checkbox: it changes what the button beside it
+   does, and `aria-pressed` says so without needing a label that reads
+   "modo rápido: activado". The bolt fills when it is on, so the state is
+   readable without relying on the tint alone. */
+.fasttoggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.fasttoggle__bolt {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+}
+.fasttoggle--on {
+  background: var(--primary-tint);
+  /* Same reason as .btn--ghost:hover — #1a73e8 on #e8f0fe is 3.93:1. */
+  color: var(--primary-hover);
+  border-color: var(--primary);
+}
+.fasttoggle--on .fasttoggle__bolt {
+  fill: currentColor;
+}

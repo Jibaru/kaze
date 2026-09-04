@@ -195,6 +195,9 @@ export interface KazeApi {
   cancelScenario(): Promise<void>
   getLocale(): Promise<import('./i18n').Locale>
   setLocale(locale: import('./i18n').Locale): Promise<void>
+  /** Whether reviews and questions take the lean, toolless path. */
+  getFastMode(): Promise<boolean>
+  setFastMode(on: boolean): Promise<void>
   /** Snapshots the design, then runs one turn against it. */
   review(diagram: Diagram, intent: TurnIntent, question?: string): Promise<ReviewOutcome>
   cancelTurn(): Promise<void>

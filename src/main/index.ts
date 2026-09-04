@@ -5,13 +5,21 @@ import { join } from 'node:path'
 import { WorkspaceStore } from './workspace-store'
 import { SessionManager } from './session-manager'
 import { VoiceService } from './voice-service'
-import { listScenarios } from './scenarios'
+import { listScenarios, readScenarioSource } from './scenarios'
 import { authorPrompt, parseAuthored, writeScenario } from './scenario-author'
+import {
+  FAST_ASK_SYSTEM,
+  FAST_REVIEW_SYSTEM,
+  fastAskPrompt,
+  fastReviewPrompt,
+  type FastContext,
+} from './fast-review'
 import { lastFencedJson, parseReview, REPAIR_PROMPT } from '../shared/findings'
 import { parsePatch, type PatchOp } from '../shared/patch'
 import { dict, REPLY_LANGUAGE, SPEECH_LANGUAGE, toLocale, type Locale } from '../shared/i18n'
 import { reconcile } from '../shared/ledger'
-import type { Diagram, ReviewEvent, ReviewOutcome, TurnIntent } from '../shared/types'
+import type { Ledger } from '../shared/ledger'
+import type { Diagram, ReviewEvent, ReviewOutcome, RevisionResult, TurnIntent } from '../shared/types'
 
 const ATTEMPT = 'default'
 
@@ -47,6 +55,21 @@ const voice = new VoiceService(join(app.getPath('userData'), 'openai.key'))
 const author = new SessionManager({ cwd: workspaceRoot, emit, useKnowledgeServer: false })
 
 const localePath = join(app.getPath('userData'), 'locale')
+const fastModePath = join(app.getPath('userData'), 'fast-mode')
+
+/**
+ * Off by default. Fast mode is a real trade — see `fast-review.ts` — and the
+ * app's whole reason to exist is the quality of the feedback, so it is opted
+ * into rather than out of. Stored like the locale, because it is a preference
+ * about how you work and not part of any one attempt.
+ */
+function fastMode(): boolean {
+  try {
+    return existsSync(fastModePath) && readFileSync(fastModePath, 'utf-8').trim() === 'on'
+  } catch {
+    return false
+  }
+}
 
 /**
  * Spanish by default. A stored choice wins; otherwise the OS locale decides,
@@ -197,6 +220,11 @@ ipcMain.handle('locale:set', async (_e, locale: Locale) => {
   await writeFile(localePath, locale, 'utf-8')
 })
 
+ipcMain.handle('mode:get-fast', () => fastMode())
+ipcMain.handle('mode:set-fast', async (_e, on: boolean) => {
+  await writeFile(fastModePath, on ? 'on' : 'off', 'utf-8')
+})
+
 ipcMain.handle('review:cancel', () => session.cancel())
 
 /**
@@ -269,17 +297,26 @@ ipcMain.handle('voice:transcribe', (_e, audio: ArrayBuffer, mimeType: string) =>
 ipcMain.handle(
   'review:run',
   async (_e, diagram: Diagram, intent: TurnIntent, question?: string): Promise<ReviewOutcome> => {
+    const locale = currentLocale()
+    const fast = fastMode()
+
     // A question about the current state still needs the design on disk to be
     // current, but only a review earns a revision number.
     if (intent !== 'review') {
       await store.saveDiagram(diagram, ATTEMPT)
-      const locale = currentLocale()
-      const answer = await session.send(
-        `${question ?? 'What do you make of the current design?'}
+      const ledger = await store.loadLedger(ATTEMPT)
+      const asked = question ?? 'What do you make of the current design?'
+      const answer = fast
+        ? await session.send(
+            fastAskPrompt(await fastContext(diagram, undefined, null, ledger, locale), asked),
+            'ask',
+            // Not `fresh`: a question continues whatever the last fast turn
+            // said, which is what makes "and why?" work.
+            { system: FAST_ASK_SYSTEM },
+          )
+        : await session.send(`${asked}
 
-${REPLY_LANGUAGE[locale]}`,
-        'ask',
-      )
+${REPLY_LANGUAGE[locale]}`, 'ask')
       return {
         intent,
         // The skill has been used all session, so the model often appends a
@@ -290,27 +327,40 @@ ${REPLY_LANGUAGE[locale]}`,
         problem: null,
         revision: null,
         // A question never disturbs the ledger, but the panel still shows it.
-        ledger: await store.loadLedger(ATTEMPT),
+        ledger,
         // An answer is spoken too — otherwise asking by voice gets a silent reply.
         audio: await speakIfPossible(answer.trim(), 0),
       }
     }
 
     const snapshot = await store.snapshotRevision(diagram, ATTEMPT)
-    const locale = currentLocale()
-    const text = await session.send(reviewPrompt(diagram.scenarioId, snapshot.revision, locale), 'review')
+    let ledger = await store.loadLedger(ATTEMPT)
+    // `fresh` on a fast review: each one is a judgement of the design as it
+    // stands now, and the continuity that matters between revisions is the
+    // ledger, which is written into the prompt. That also keeps the tenth
+    // review as quick as the first.
+    const turn = fast ? { system: FAST_REVIEW_SYSTEM, fresh: true } : undefined
+    const text = fast
+      ? await session.send(
+          fastReviewPrompt(
+            await fastContext(diagram, snapshot.revision, snapshot.diff, ledger, locale),
+          ),
+          'review',
+          turn,
+        )
+      : await session.send(reviewPrompt(diagram.scenarioId, snapshot.revision, locale), 'review')
     let parsed = parseReview(text)
 
     if (!parsed.payload) {
       // One corrective turn before degrading to markdown-only. Cheap, and it
       // rescues the common case of a reply that trails off after the block.
       emit({ kind: 'warning', message: dict(locale).askingAgain(dict(locale)[parsed.problem === 'no-block' ? 'noFindingsBlock' : 'notAPayload']) })
-      const repair = await session.send(REPAIR_PROMPT, 'review')
+      // Continues the turn it is repairing, so `fresh` is deliberately dropped.
+      const repair = await session.send(REPAIR_PROMPT, 'review', fast ? { system: FAST_REVIEW_SYSTEM } : undefined)
       const repaired = parseReview(repair)
       if (repaired.payload) parsed = { ...parsed, payload: repaired.payload, problem: null }
     }
 
-    let ledger = await store.loadLedger(ATTEMPT)
     if (parsed.payload) {
       ledger = reconcile(ledger, parsed.payload, snapshot.revision)
       await store.saveLedger(ledger, ATTEMPT)
@@ -337,6 +387,28 @@ async function speakIfPossible(text: string, revision: number): Promise<string |
     const reason = err instanceof Error ? err.message : String(err)
     emit({ kind: 'warning', message: dict(currentLocale()).couldNotSpeak(reason) })
     return null
+  }
+}
+
+/**
+ * Everything a fast turn would otherwise have opened a file to read. Assembled
+ * here rather than in `fast-review.ts` because this is where the workspace and
+ * the store live; that module only knows how to phrase it.
+ */
+async function fastContext(
+  diagram: Diagram,
+  revision: number | undefined,
+  diff: RevisionResult['diff'] | null,
+  ledger: Ledger | null,
+  locale: Locale,
+): Promise<FastContext> {
+  return {
+    scenario: await readScenarioSource(workspaceRoot, diagram.scenarioId),
+    diagram,
+    revision,
+    diff,
+    ledger,
+    locale,
   }
 }
 
