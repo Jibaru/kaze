@@ -35,6 +35,18 @@ export interface Dict {
   services: string
   noScenarios: string
   scenarioLabel: string
+  newScenario: string
+  newScenarioCancel: string
+  topicLabel: string
+  topicPlaceholder: string
+  difficulty: string
+  difficultyLevel: (n: number) => string
+  createScenario: string
+  creatingScenario: string
+  scenarioCreated: (title: string) => string
+  openScenarioFolder: string
+  rubricStaysHidden: string
+  authorFailed: Record<string, string>
 
   // ── palette ──────────────────────────────────────────────────────────
   searchServices: string
@@ -139,6 +151,23 @@ const es: Dict = {
   services: 'Servicios',
   noScenarios: 'No hay escenarios en el espacio de trabajo.',
   scenarioLabel: 'Escenario de práctica',
+  newScenario: 'Nuevo escenario',
+  newScenarioCancel: 'Cancelar',
+  topicLabel: 'Tema',
+  topicPlaceholder: 'p. ej. el feed de una red social, o reservas de vuelos con inventario limitado',
+  difficulty: 'Dificultad',
+  difficultyLevel: (n) => ['', 'Primera entrevista', 'Intermedia', 'Senior'][n] ?? String(n),
+  createScenario: 'Crear',
+  creatingScenario: 'Escribiendo el escenario…',
+  scenarioCreated: (title) => `Escenario creado: ${title}`,
+  openScenarioFolder: 'Abrir la carpeta de escenarios',
+  rubricStaysHidden:
+    'Claude escribe el enunciado y la rúbrica con la que se te evaluará. La rúbrica queda oculta a propósito: si la lees, dejas de practicar.',
+  authorFailed: {
+    'no-block': 'La respuesta no traía un archivo de escenario.',
+    'no-frontmatter': 'El escenario generado no tiene cabecera; no se guardó.',
+    'no-rubric': 'El escenario generado no traía rúbrica, así que no se podría evaluar. No se guardó.',
+  },
 
   searchServices: 'Buscar servicios de AWS',
   searchPlaceholder: 'Buscar servicios — prueba «redis», «cola»',
@@ -337,6 +366,23 @@ const en: Dict = {
   services: 'Services',
   noScenarios: 'No scenarios found in the workspace.',
   scenarioLabel: 'Practice scenario',
+  newScenario: 'New scenario',
+  newScenarioCancel: 'Cancel',
+  topicLabel: 'Topic',
+  topicPlaceholder: 'e.g. a social feed, or flight booking with limited inventory',
+  difficulty: 'Difficulty',
+  difficultyLevel: (n) => ['', 'First interview', 'Intermediate', 'Senior'][n] ?? String(n),
+  createScenario: 'Create',
+  creatingScenario: 'Writing the scenario…',
+  scenarioCreated: (title) => `Scenario created: ${title}`,
+  openScenarioFolder: 'Open the scenarios folder',
+  rubricStaysHidden:
+    'Claude writes the brief and the rubric you will be graded against. The rubric stays hidden on purpose: read it and you stop practising.',
+  authorFailed: {
+    'no-block': 'The reply did not contain a scenario file.',
+    'no-frontmatter': 'The generated scenario has no frontmatter, so it was not saved.',
+    'no-rubric': 'The generated scenario had no rubric, so it could not be graded. It was not saved.',
+  },
 
   searchServices: 'Search AWS services',
   searchPlaceholder: 'Search services — try “redis”, “queue”',

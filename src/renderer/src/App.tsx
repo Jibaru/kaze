@@ -163,6 +163,17 @@ function Canvas() {
 
   const speech = useSpokenSummary()
 
+  /** Reload the bank after authoring, and start practising the new brief. */
+  const adoptScenario = useCallback(
+    async (id: string) => {
+      const found = await window.kaze.listScenarios()
+      setScenarios(found)
+      setScenarioId(id)
+      setStatus(t.scenarioCreated(found.find((s) => s.id === id)?.title ?? id))
+    },
+    [t],
+  )
+
   const selectNodes = useCallback(
     (ids: string[]) => {
       if (ids.length === 0) return
@@ -304,7 +315,12 @@ function Canvas() {
       <aside className="rail rail--left">
         <div className="rail__section rail__section--scenario">
           <h2 className="rail__title">{t.scenario}</h2>
-          <ScenarioPanel scenarios={scenarios} activeId={scenarioId} onSelect={setScenarioId} />
+          <ScenarioPanel
+            scenarios={scenarios}
+            activeId={scenarioId}
+            onSelect={setScenarioId}
+            onCreated={(id) => void adoptScenario(id)}
+          />
         </div>
         <div className="rail__section">
           <h2 className="rail__title">{t.boundaries}</h2>

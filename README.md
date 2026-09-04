@@ -25,6 +25,15 @@ something, review again, and watch that finding flip to **resolved**.
   `gpt-4o-mini-tts` out. The key is encrypted with the OS keystore and never
   leaves the main process.
 
+## Your own scenarios
+
+`+ New scenario` asks for a topic and Claude writes the whole brief — including
+the hidden rubric the review grades against. There is deliberately no rubric
+field: it is hidden so you cannot design to it, and writing it yourself would
+hand you the answer key. The app is the only thing that ever reads that section
+back. Hand-editing is one button away for anyone who wants it; scenarios are
+plain markdown in the workspace.
+
 ## Idioma
 
 La interfaz esta en espanol por defecto; el ingles se elige en la barra inferior.

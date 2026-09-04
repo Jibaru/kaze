@@ -144,6 +144,9 @@ export interface KazeApi {
   snapshotRevision(diagram: Diagram): Promise<RevisionResult>
   workspacePath(): Promise<string>
   listScenarios(): Promise<Scenario[]>
+  /** Asks the model to write a scenario, rubric included, and stores it. */
+  createScenario(topic: string, difficulty: number): Promise<{ id: string } | { error: string }>
+  revealScenarios(): Promise<string>
   getLocale(): Promise<import('./i18n').Locale>
   setLocale(locale: import('./i18n').Locale): Promise<void>
   /** Snapshots the design, then runs one turn against it. */

@@ -6,6 +6,7 @@ import { WorkspaceStore } from './workspace-store'
 import { SessionManager } from './session-manager'
 import { VoiceService } from './voice-service'
 import { listScenarios } from './scenarios'
+import { authorPrompt, parseAuthored, writeScenario } from './scenario-author'
 import { parseReview, REPAIR_PROMPT } from '../shared/findings'
 import { dict, REPLY_LANGUAGE, SPEECH_LANGUAGE, toLocale, type Locale } from '../shared/i18n'
 import { reconcile } from '../shared/ledger'
@@ -26,6 +27,14 @@ const emit = (event: ReviewEvent) => win?.webContents.send('review:event', event
 
 const session = new SessionManager({ cwd: store.attemptDir(ATTEMPT), emit })
 const voice = new VoiceService(join(app.getPath('userData'), 'openai.key'))
+
+/**
+ * Authoring runs in its own session, at the workspace root rather than inside an
+ * attempt. Writing a scenario has nothing to do with the design under review,
+ * and mixing the two would leave the reviewer's context carrying a brief it was
+ * never asked about.
+ */
+const author = new SessionManager({ cwd: workspaceRoot, emit, useKnowledgeServer: false })
 
 const localePath = join(app.getPath('userData'), 'locale')
 
@@ -121,6 +130,20 @@ ipcMain.handle('design:snapshot', async (_e, diagram: Diagram) => store.snapshot
 ipcMain.handle('workspace:path', () => store.root)
 
 ipcMain.handle('scenario:list', () => listScenarios(workspaceRoot, currentLocale()))
+
+ipcMain.handle('scenario:reveal', () => shell.openPath(join(workspaceRoot, 'scenarios')))
+
+ipcMain.handle(
+  'scenario:create',
+  async (_e, topic: string, difficulty: number): Promise<{ id: string } | { error: string }> => {
+    const locale = currentLocale()
+    const reply = await author.send(authorPrompt(topic, difficulty, locale), 'ask')
+    const parsed = parseAuthored(reply)
+    if ('error' in parsed) return parsed
+    const { id } = await writeScenario(workspaceRoot, parsed.markdown, topic)
+    return { id }
+  },
+)
 
 ipcMain.handle('locale:get', () => currentLocale())
 ipcMain.handle('locale:set', async (_e, locale: Locale) => {

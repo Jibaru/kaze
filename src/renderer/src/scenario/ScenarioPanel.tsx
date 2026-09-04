@@ -1,5 +1,6 @@
 import type { Scenario } from '@shared/types'
 import { useT } from '../i18n/useLocale'
+import { NewScenario } from './NewScenario'
 
 /**
  * The brief you are designing against. The scenario's rubric is stripped in the
@@ -9,16 +10,24 @@ export function ScenarioPanel({
   scenarios,
   activeId,
   onSelect,
+  onCreated,
 }: {
   scenarios: Scenario[]
   activeId: string
   onSelect: (id: string) => void
+  /** A scenario was just written; reload the bank and switch to it. */
+  onCreated: (id: string) => void
 }) {
   const t = useT()
   const active = scenarios.find((s) => s.id === activeId)
 
   if (scenarios.length === 0) {
-    return <p className="inspector__hint">{t.noScenarios}</p>
+    return (
+      <div className="scenario">
+        <p className="inspector__hint">{t.noScenarios}</p>
+        <NewScenario onCreated={onCreated} />
+      </div>
+    )
   }
 
   return (
@@ -35,6 +44,7 @@ export function ScenarioPanel({
           </option>
         ))}
       </select>
+      <NewScenario onCreated={onCreated} />
       {active && <div className="scenario__brief">{renderBrief(active.brief)}</div>}
     </div>
   )

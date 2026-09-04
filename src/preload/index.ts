@@ -9,6 +9,9 @@ const api: KazeApi = {
   snapshotRevision: (diagram: Diagram) => ipcRenderer.invoke('design:snapshot', diagram),
   workspacePath: () => ipcRenderer.invoke('workspace:path'),
   listScenarios: () => ipcRenderer.invoke('scenario:list'),
+  createScenario: (topic: string, difficulty: number) =>
+    ipcRenderer.invoke('scenario:create', topic, difficulty),
+  revealScenarios: () => ipcRenderer.invoke('scenario:reveal'),
   getLocale: () => ipcRenderer.invoke('locale:get'),
   setLocale: (locale: Locale) => ipcRenderer.invoke('locale:set', locale),
   review: (diagram: Diagram, intent: TurnIntent, question?: string) =>

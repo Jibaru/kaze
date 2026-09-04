@@ -904,3 +904,59 @@ button, input, select { font-family: inherit; font-size: inherit; color: inherit
     transition: none;
   }
 }
+
+/* ── authoring a scenario ───────────────────────────────────────────────── */
+.scenario__actions { display: flex; align-items: center; gap: 10px; margin: 4px 0 12px; flex-wrap: wrap; }
+
+.btn--small { min-height: 32px; padding: 0 14px; font-size: var(--text-sm); }
+
+/* A text button for the secondary escape hatch. It is still a button, so it
+   gets a hit area and a focus ring like everything else. */
+.linkbtn {
+  min-height: 32px;
+  background: transparent;
+  border: 0;
+  padding: 0 2px;
+  color: var(--primary);
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.linkbtn:hover { color: var(--primary-hover); }
+
+.newscenario {
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.newscenario__hint {
+  margin: 0 0 14px;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  color: var(--text-secondary);
+}
+.newscenario__topic {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: var(--text-md);
+  line-height: var(--lh-md);
+  resize: vertical;
+}
+.newscenario__topic:focus { outline: none; border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+.newscenario__topic::placeholder { color: var(--text-secondary); }
+.newscenario__error {
+  margin: 0 0 12px;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  color: var(--danger-ink);
+  background: var(--danger-tint);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
