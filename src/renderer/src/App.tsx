@@ -33,6 +33,7 @@ import { EdgeInspector } from './inspector/EdgeInspector'
 import { ConversationBar, type ChatState } from './conversation/ConversationBar'
 import { useVoiceLoop } from './voice/useVoiceLoop'
 import { useStreamedSpeech } from './voice/useStreamedSpeech'
+import { useAudioInputs } from './voice/useAudioInputs'
 import { applyPatch, type PatchOp } from '@shared/patch'
 import { serialize } from '@shared/adl'
 import { Toast } from './toast/Toast'
@@ -92,6 +93,15 @@ function Canvas() {
    */
   const [chat, setChat] = useState<{ say: string; busy: boolean; refused: string[] } | null>(null)
   const [muted, setMuted] = useState(false)
+  /**
+   * Whatever went wrong with the microphone, shown *in the mode*. It used to go
+   * to the status bar, which conversation mode hides — so a denied microphone,
+   * a failed transcription or a turn that heard nothing all looked exactly like
+   * the app ignoring you.
+   */
+  const [chatNote, setChatNote] = useState('')
+  /** Space held: record whatever the detector thinks. */
+  const [holding, setHolding] = useState(false)
   /** Read inside a callback that must not re-register on every turn. */
   const chatRef = useRef(chat)
   chatRef.current = chat
@@ -564,12 +574,46 @@ function Canvas() {
     [landChatTurn],
   )
 
+  // Listed only while the mode is open: enumerating devices is cheap, and the
+  // labels are only readable once microphone permission has been granted.
+  const mics = useAudioInputs(chat !== null)
+
   const loop = useVoiceLoop({
     active: chat !== null && !chat.busy && !muted && !chatSpeech.playing,
-    onUtterance: chatSaid,
-    onError: setStatus,
+    force: holding,
+    deviceId: mics.deviceId,
+    onUtterance: (said) => {
+      setChatNote('')
+      chatSaid(said)
+    },
+    onError: setChatNote,
     messages: { denied: t.micDenied, nothing: t.heardNothing },
   })
+
+  // Hold space to talk, inside the mode as well as outside it. The detector is
+  // a convenience; this is the guarantee.
+  useEffect(() => {
+    if (!chat) return
+    const down = (e: KeyboardEvent) => {
+      if (e.code !== 'Space' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
+      const el = document.activeElement as HTMLElement | null
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return
+      e.preventDefault()
+      chatSpeech.stop()
+      setHolding(true)
+    }
+    const up = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return
+      e.preventDefault()
+      setHolding(false)
+    }
+    window.addEventListener('keydown', down)
+    window.addEventListener('keyup', up)
+    return () => {
+      window.removeEventListener('keydown', down)
+      window.removeEventListener('keyup', up)
+    }
+  }, [chat, chatSpeech])
 
   const enterChat = useCallback(async () => {
     if (!hasVoiceKey) {
@@ -577,6 +621,7 @@ function Canvas() {
       return
     }
     setMuted(false)
+    setChatNote('')
     setChat({ say: '', busy: true, refused: [] })
     try {
       landChatTurn(await window.kaze.openChat(diagramRef.current))
@@ -600,6 +645,9 @@ function Canvas() {
 
   const mic = usePushToTalk({
     enabled: hasVoiceKey && !streaming && !chat,
+    // Same root cause outside the mode: the system default input is not
+    // necessarily a microphone.
+    deviceId: mics.deviceId,
     onUtterance: (text, intent) => void runTurn(intent, intent === 'ask' ? text : undefined),
     onBargeIn: () => {
       speech.stop()
@@ -646,17 +694,31 @@ function Canvas() {
    * others are things happening, so a muted microphone must not hide the fact
    * that it is mid-sentence — muting stops it hearing you, not talking to you.
    */
-  const chatState: ChatState = chatSpeech.playing
-    ? 'speaking'
-    : chat?.busy
-      ? 'thinking'
+  /**
+   * What it is doing, most immediate first.
+   *
+   * `hearing` comes before everything because it is the answer to the question
+   * you are asking while you talk. `muted` sits near the bottom: it is a
+   * resting state, and a muted microphone must not hide the fact that the app
+   * is mid-sentence — muting stops it hearing you, not talking to you.
+   */
+  const chatState: ChatState =
+    loop.state === 'hearing'
+      ? 'hearing'
       : loop.state === 'transcribing'
         ? 'transcribing'
-        : muted
-          ? 'muted'
-          : loop.state === 'hearing'
-            ? 'hearing'
-            : 'listening'
+        : chat?.busy
+          ? 'thinking'
+          : chatSpeech.playing
+            ? 'speaking'
+            : muted
+              ? 'muted'
+              : loop.state === 'off'
+                // "Escuchando" was the fallback for everything, including a
+                // microphone that had not opened. Saying you are listening
+                // when you are not is the exact failure this mode had.
+                ? 'opening'
+                : 'listening'
 
   return (
     // Conversation mode is a class, not a different tree: the canvas keeps its
@@ -802,6 +864,12 @@ function Canvas() {
           level={loop.level}
           say={chat.say}
           heard={loop.heard}
+          note={chatNote}
+          listening={loop.state !== 'off'}
+          signal={loop.signal}
+          inputs={mics.inputs}
+          deviceId={mics.deviceId}
+          onDevice={mics.choose}
           onToggleMute={() => setMuted((m) => !m)}
           onInterrupt={() => chatSpeech.stop()}
           onExit={exitChat}

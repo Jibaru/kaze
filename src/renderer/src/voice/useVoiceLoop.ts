@@ -37,19 +37,52 @@ const MAX_SPEECH_MS = 30_000
  * A room with a fan in it should not hold the microphone open forever, and a
  * silent room should not make the threshold so low that the analyser's own
  * noise opens it.
+ *
+ * The first numbers here were guesses and they were too high: nothing opened
+ * the microphone at all. `usePushToTalk` treats anything above 0.012 RMS as
+ * speech, which is the one measurement in this app taken from a real voice in
+ * this room, so the bar to *start* listening has to sit under it, not at nearly
+ * twice it.
  */
-const FLOOR_FLOOR = 0.006
-const OVER_FLOOR = 3.5
-const MIN_THRESHOLD = 0.014
+const FLOOR_FLOOR = 0.004
+const OVER_FLOOR = 2.2
+const MIN_THRESHOLD = 0.009
+
+/**
+ * Below this, over this long, the input is not quiet — it is dead. A real
+ * microphone in an empty room still delivers its own noise floor, comfortably
+ * above this; a virtual device with nothing routed into it delivers zeros.
+ */
+const DEAD_INPUT_RMS = 0.0006
+const SILENCE_WINDOW_MS = 2500
 
 export function useVoiceLoop({
   active,
+  force,
+  deviceId,
   onUtterance,
   onError,
   messages,
 }: {
   /** Listen now. False while the app is thinking or speaking, and while muted. */
   active: boolean
+  /**
+   * Record regardless of what the detector thinks — the space bar, held.
+   *
+   * A hands-free microphone that does not open leaves you talking to a machine
+   * that is not listening, with nothing on screen to say so. This is the way
+   * out of that: it is the same gesture the rest of the app uses, and it works
+   * whatever the room sounds like.
+   */
+  force: boolean
+  /**
+   * Which microphone. Not optional in practice: the system default is not
+   * necessarily a microphone at all. On this machine it was a virtual device
+   * that returns silence, which looks from the inside exactly like a room
+   * where nobody is speaking — the detector never opens, nothing is ever sent,
+   * and there is no error anywhere to notice.
+   */
+  deviceId: string
   onUtterance: (text: string) => void
   onError: (message: string) => void
   messages: { denied: string; nothing: string }
@@ -62,9 +95,19 @@ export function useVoiceLoop({
    */
   const handlers = useRef({ onUtterance, onError, messages })
   handlers.current = { onUtterance, onError, messages }
+  const forced = useRef(force)
+  forced.current = force
+  /** Last tick's value, so releasing the key can be noticed. */
+  const wasForced = useRef(false)
 
   const [state, setState] = useState<LoopState>('off')
   const [heard, setHeard] = useState('')
+  /**
+   * False once the input has been flat for a few seconds. A microphone that is
+   * open and delivering nothing is the failure this app could not see, so it
+   * is now something the mode can say out loud.
+   */
+  const [signal, setSignal] = useState(true)
   /** 0..1, for the level ring. Rendered, so it lives in state. */
   const [level, setLevel] = useState(0)
 
@@ -80,18 +123,32 @@ export function useVoiceLoop({
   const startedAt = useRef(0)
   const quietSince = useRef(0)
   const peak = useRef(0)
+  /** The device the open stream was acquired with. */
+  const openedWith = useRef(deviceId)
+  /** Loudest sample seen since the silence check last ran. */
+  const window_ = useRef({ since: 0, loudest: 0 })
+  /** Transcribing. The microphone stays open, but it must not start a second
+   *  utterance on top of the one being sent. */
+  const sending = useRef(false)
   /** Stops a teardown mid-flight from delivering an utterance nobody wants. */
   const generation = useRef(0)
 
   const send = useCallback(async (blob: Blob, spokeFor: number, loudest: number, mine: number) => {
-    if (spokeFor < MIN_SPEECH_MS || blob.size === 0 || loudest < MIN_THRESHOLD) return
+    if (spokeFor < MIN_SPEECH_MS || blob.size === 0 || loudest < MIN_THRESHOLD) {
+      // Not an error worth a message — a chair, a cough, a door — but the
+      // detector opening on nothing over and over is worth being able to see.
+      sending.current = false
+      setState('listening')
+      return
+    }
+    sending.current = true
     setState('transcribing')
     try {
       const text = await window.kaze.transcribe(await blob.arrayBuffer(), blob.type)
       if (mine !== generation.current) return
       if (!text) {
-        setState('listening')
         handlers.current.onError(handlers.current.messages.nothing)
+        setState('listening')
         return
       }
       setHeard(text)
@@ -100,6 +157,8 @@ export function useVoiceLoop({
       if (mine !== generation.current) return
       setState('listening')
       handlers.current.onError(err instanceof Error ? err.message : String(err))
+    } finally {
+      sending.current = false
     }
   }, [])
 
@@ -110,8 +169,14 @@ export function useVoiceLoop({
     const spokeFor = Date.now() - startedAt.current
     const loudest = peak.current
     const mine = generation.current
+    // The chunks are taken now, not read inside `onstop`. `stop()` is
+    // asynchronous, and the detector keeps ticking in the meantime: a new
+    // utterance opening in that window used to clear the array out from under
+    // the one being closed, and the recording vanished with no error anywhere.
+    const captured = chunks.current
+    chunks.current = []
     rec.onstop = () => {
-      void send(new Blob(chunks.current, { type: 'audio/webm' }), spokeFor, loudest, mine)
+      void send(new Blob(captured, { type: 'audio/webm' }), spokeFor, loudest, mine)
     }
     rec.stop()
   }, [send])
@@ -130,18 +195,32 @@ export function useVoiceLoop({
       timer.current = null
       setState('off')
       setLevel(0)
+      window_.current = { since: 0, loudest: 0 }
       return
     }
 
     let cancelled = false
     const mine = ++generation.current
+    if (stream.current && openedWith.current !== deviceId) {
+      stream.current.getTracks().forEach((track) => track.stop())
+      stream.current = null
+      analyser.current = null
+    }
+    openedWith.current = deviceId
 
     void (async () => {
       try {
         // Kept open for the life of the mode: re-acquiring costs ~300 ms, which
         // in a conversation is a stutter at the start of every answer.
         stream.current ??= await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          audio: {
+            // `exact`, so a device that has gone away fails loudly instead of
+            // quietly falling back to the default that caused the problem.
+            ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
         })
       } catch {
         handlers.current.onError(handlers.current.messages.denied)
@@ -171,14 +250,30 @@ export function useVoiceLoop({
         const speaking = rms > threshold
         const recording = recorder.current?.state === 'recording'
 
-        setLevel(Math.min(1, rms / (threshold * 3)))
+        // Half scale is the threshold, so the meter shows not just that the
+        // microphone hears something but whether it hears enough.
+        // Is anything at all arriving? Distinct from "is anyone speaking":
+        // a flat line means the wrong device, not a quiet room.
+        const now = Date.now()
+        const w = window_.current
+        if (w.since === 0) w.since = now
+        w.loudest = Math.max(w.loudest, rms)
+        if (now - w.since > SILENCE_WINDOW_MS) {
+          setSignal(w.loudest > DEAD_INPUT_RMS)
+          window_.current = { since: now, loudest: 0 }
+        }
+
+        const next = Math.min(1, rms / (threshold * 2))
+        // Twenty-five renders a second of the whole app is a real cost, and the
+        // eye cannot see a two-percent step anyway.
+        setLevel((current) => (Math.abs(current - next) > 0.02 ? next : current))
 
         if (!recording) {
           // The floor only learns while nobody is talking, or a long sentence
           // would raise it until it swallowed the end of itself.
           floor.current = Math.max(FLOOR_FLOOR, floor.current * 0.94 + rms * 0.06)
           open.current = speaking ? open.current + 1 : 0
-          if (open.current >= OPEN_FRAMES) {
+          if (!sending.current && (forced.current || open.current >= OPEN_FRAMES)) {
             chunks.current = []
             startedAt.current = Date.now()
             quietSince.current = 0
@@ -193,15 +288,19 @@ export function useVoiceLoop({
           }
         } else {
           peak.current = Math.max(peak.current, rms)
-          if (speaking) quietSince.current = 0
+          if (speaking || forced.current) quietSince.current = 0
           else if (quietSince.current === 0) quietSince.current = Date.now()
 
           const quietFor = quietSince.current ? Date.now() - quietSince.current : 0
-          if (quietFor > CLOSE_MS || Date.now() - startedAt.current > MAX_SPEECH_MS) {
+          // Letting go of the key ends the utterance at once: you decided it
+          // was over, and the detector has no better opinion than yours.
+          const released = wasForced.current && !forced.current
+          if (released || quietFor > CLOSE_MS || Date.now() - startedAt.current > MAX_SPEECH_MS) {
             closeUtterance()
           }
         }
 
+        wasForced.current = forced.current
         timer.current = window.setTimeout(tick, SAMPLE_MS)
       }
       tick()
@@ -212,7 +311,7 @@ export function useVoiceLoop({
       if (timer.current) window.clearTimeout(timer.current)
       timer.current = null
     }
-  }, [active, closeUtterance])
+  }, [active, deviceId, closeUtterance])
 
   /** Let go of the device when the mode closes; a lit mic light is a promise. */
   const release = useCallback(() => {
@@ -235,5 +334,5 @@ export function useVoiceLoop({
 
   useEffect(() => release, [release])
 
-  return { state, heard, level, release }
+  return { state, heard, level, signal, release }
 }

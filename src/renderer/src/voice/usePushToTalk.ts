@@ -38,12 +38,16 @@ function isTyping(): boolean {
 
 export function usePushToTalk({
   enabled,
+  deviceId,
   onUtterance,
   onBargeIn,
   onError,
   messages,
 }: {
   enabled: boolean
+  /** Which microphone. '' takes the system default, which on some machines is
+   *  a virtual device that returns silence — see `useAudioInputs`. */
+  deviceId: string
   onUtterance: (text: string, intent: TurnIntent) => void
   /** Fires the instant a key goes down, before any audio: stop the playback. */
   onBargeIn: () => void
@@ -58,6 +62,7 @@ export function usePushToTalk({
   const intent = useRef<TurnIntent>('review')
   const startedAt = useRef(0)
   const stream = useRef<MediaStream | null>(null)
+  const openedWith = useRef(deviceId)
   const context = useRef<AudioContext | null>(null)
   const analyser = useRef<AnalyserNode | null>(null)
   const meter = useRef<number | null>(null)
@@ -73,8 +78,18 @@ export function usePushToTalk({
       try {
         // Kept open between utterances: re-acquiring costs ~300ms, which is
         // most of a short command.
+        if (stream.current && openedWith.current !== deviceId) {
+          stream.current.getTracks().forEach((track) => track.stop())
+          stream.current = null
+          analyser.current = null
+        }
+        openedWith.current = deviceId
         stream.current ??= await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true },
+          audio: {
+            ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+            echoCancellation: true,
+            noiseSuppression: true,
+          },
         })
       } catch {
         onError(messages.denied)
@@ -144,7 +159,7 @@ export function usePushToTalk({
       rec.start()
       setState('recording')
     },
-    [onUtterance, onError, messages],
+    [onUtterance, onError, messages, deviceId],
   )
 
   useEffect(() => {

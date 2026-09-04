@@ -1,3 +1,5 @@
+import type { KeyboardEvent } from 'react'
+import type { AudioInput } from '../voice/useAudioInputs'
 import { useT } from '../i18n/useLocale'
 
 /**
@@ -15,7 +17,7 @@ import { useT } from '../i18n/useLocale'
  * than one that cannot hear at all.
  */
 
-export type ChatState = 'listening' | 'hearing' | 'transcribing' | 'thinking' | 'speaking' | 'muted'
+export type ChatState = 'opening' | 'listening' | 'hearing' | 'transcribing' | 'thinking' | 'speaking' | 'muted'
 
 export function ConversationBar({
   state,
@@ -23,6 +25,12 @@ export function ConversationBar({
   level,
   say,
   heard,
+  note,
+  listening,
+  signal,
+  inputs,
+  deviceId,
+  onDevice,
   onToggleMute,
   onInterrupt,
   onExit,
@@ -40,17 +48,52 @@ export function ConversationBar({
   say: string
   /** The last thing it heard you say. */
   heard: string
+  /** Whatever went wrong with the microphone. Shown here because the status
+   *  bar this used to use is not on screen in this mode. */
+  note: string
+  /** The detector is actually running, as opposed to the chip merely saying so. */
+  listening: boolean
+  /** The chosen microphone is delivering something. False means a dead input. */
+  signal: boolean
+  inputs: AudioInput[]
+  deviceId: string
+  onDevice: (id: string) => void
   onToggleMute: () => void
   /** Stop it talking and start listening again. */
   onInterrupt: () => void
   onExit: () => void
 }) {
   const t = useT()
-  const busy = state === 'thinking' || state === 'transcribing'
+  const busy = state === 'thinking' || state === 'transcribing' || state === 'opening'
+
+  /**
+   * Space is the talk key in this mode, and a focused button activates on
+   * space. Without this, pressing space to speak also presses whichever
+   * control you last clicked — observed live as the microphone silently
+   * un-muting itself mid-sentence. Enter still works, and focus is left where
+   * it is rather than blurred out from under a keyboard user.
+   */
+  const holdKey = (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (e.code === 'Space') e.preventDefault()
+  }
 
   return (
     <div className="chatbar">
       <div className="chatbar__captions">
+        {/* The failure this app could not see. A microphone that is open and
+            delivering silence looks exactly like a quiet room from in here,
+            and on this machine the system default was a virtual device that
+            returns nothing at all. */}
+        {listening && !signal && (
+          <p className="chatbar__note" role="status">
+            {t.chatNoSignal}
+          </p>
+        )}
+        {note && (
+          <p className="chatbar__note" role="status">
+            {note}
+          </p>
+        )}
         {heard && (
           <p className="chatbar__heard">
             <span className="chatbar__who">{t.chatYou}</span> {heard}
@@ -66,6 +109,7 @@ export function ConversationBar({
         <button
           className={`chatstate chatstate--${state}`}
           onClick={state === 'speaking' ? onInterrupt : onToggleMute}
+          onKeyDown={holdKey}
           aria-live="polite"
           title={state === 'speaking' ? t.chatInterrupt : t.chatMuteHint}
         >
@@ -79,9 +123,36 @@ export function ConversationBar({
           {busy && <span className="chatstate__ellipsis" aria-hidden />}
         </button>
 
+        {/* Always on screen, not only while it is recording.
+            "I spoke and nothing happened" and "I spoke and it did not hear me"
+            look identical without this, and only one of them is fixable by
+            speaking up. Half scale is the level at which it starts listening. */}
+        {inputs.length > 1 && (
+          <select
+            className="chatbar__device"
+            aria-label={t.chatDevice}
+            title={t.chatDevice}
+            value={deviceId}
+            onChange={(e) => onDevice(e.target.value)}
+          >
+            {inputs.map((d) => (
+              <option key={d.deviceId} value={d.deviceId}>
+                {d.label}
+              </option>
+            ))}
+          </select>
+        )}
+
+        <span className="meter" title={t.chatMeterHint} aria-hidden>
+          {[0.14, 0.34, 0.54, 0.74, 0.94].map((at) => (
+            <span key={at} className={`meter__bar${level >= at ? ' meter__bar--lit' : ''}${at >= 0.5 ? ' meter__bar--over' : ''}`} />
+          ))}
+        </span>
+
         <button
           className={`btn btn--ghost chatbar__mute${muted ? ' chatbar__mute--on' : ''}`}
           onClick={onToggleMute}
+          onKeyDown={holdKey}
           aria-pressed={muted}
           title={t.chatMuteHint}
         >
@@ -93,10 +164,12 @@ export function ConversationBar({
           {muted ? t.chatUnmute : t.chatMute}
         </button>
 
-        <button className="btn btn--ghost" onClick={onExit}>
+        <button className="btn btn--ghost" onClick={onExit} onKeyDown={holdKey}>
           {t.chatExit}
         </button>
       </div>
+
+      <p className="chatbar__hint">{t.chatHoldHint}</p>
     </div>
   )
 }

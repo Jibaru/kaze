@@ -146,6 +146,10 @@ export interface Dict {
   chatMuteHint: string
   chatInterrupt: string
   chatExit: string
+  chatMeterHint: string
+  chatDevice: string
+  chatNoSignal: string
+  chatHoldHint: string
   chatNoKey: string
   chatDrew: (changes: string) => string
   fastMode: string
@@ -318,6 +322,7 @@ const es: Dict = {
   chatModeHint:
     'Modo conversación: solo el diagrama, micrófono abierto. Le dices qué añadir y lo dibuja. Sales cuando quieras.',
   chatState: {
+    opening: 'Abriendo micrófono',
     listening: 'Escuchando',
     hearing: 'Te escucho',
     transcribing: 'Transcribiendo',
@@ -331,6 +336,10 @@ const es: Dict = {
   chatMuteHint: 'Apagar o encender el micrófono. Mientras habla, púlsalo para interrumpir.',
   chatInterrupt: 'Interrumpir y hablar',
   chatExit: 'Salir',
+  chatMeterHint: 'Nivel del micrófono. A partir de la mitad empieza a escucharte.',
+  chatDevice: 'Micrófono',
+  chatNoSignal: 'No llega señal de ese micrófono. Elige otro en la lista de al lado.',
+  chatHoldHint: 'Habla y te escucha sola. Si no te oye, mantén espacio pulsado mientras hablas.',
   chatNoKey: 'El modo conversación necesita la clave de OpenAI para oír y hablar.',
   chatDrew: (changes) => `Dibujado: ${changes}`,
   fastMode: 'Rápido',
@@ -615,6 +624,7 @@ const en: Dict = {
   chatModeHint:
     'Conversation mode: the diagram and nothing else, microphone open. Tell it what to add and it draws. Leave whenever you like.',
   chatState: {
+    opening: 'Opening microphone',
     listening: 'Listening',
     hearing: 'Hearing you',
     transcribing: 'Transcribing',
@@ -628,6 +638,10 @@ const en: Dict = {
   chatMuteHint: 'Turn the microphone off or on. While it is speaking, press to interrupt.',
   chatInterrupt: 'Interrupt and speak',
   chatExit: 'Leave',
+  chatMeterHint: 'Microphone level. From halfway up it starts listening.',
+  chatDevice: 'Microphone',
+  chatNoSignal: 'Nothing is arriving from that microphone. Pick another one beside this.',
+  chatHoldHint: 'Just talk — it listens on its own. If it does not hear you, hold space while you speak.',
   chatNoKey: 'Conversation mode needs the OpenAI key to hear and speak.',
   chatDrew: (changes) => `Drew: ${changes}`,
   fastMode: 'Fast',

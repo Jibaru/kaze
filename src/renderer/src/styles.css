@@ -1541,3 +1541,64 @@ button, input, select { font-family: inherit; font-size: inherit; color: inherit
   .chatstate__ellipsis::after { animation: none; }
   .chatstate__ring { transition: none; }
 }
+
+/* The microphone level, always on screen while the mode is open.
+   "I spoke and nothing happened" and "I spoke and it did not hear me" look
+   identical without it, and only one of those is fixed by speaking up. */
+.meter {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 18px;
+  padding: 0 6px;
+}
+.meter__bar {
+  width: 3px;
+  border-radius: 2px;
+  background: var(--grey-300, #dadce0);
+  transition: background-color 90ms linear;
+}
+.meter__bar:nth-child(1) { height: 6px; }
+.meter__bar:nth-child(2) { height: 9px; }
+.meter__bar:nth-child(3) { height: 12px; }
+.meter__bar:nth-child(4) { height: 15px; }
+.meter__bar:nth-child(5) { height: 18px; }
+/* Under the threshold it is only picking up the room; over it, it is listening. */
+.meter__bar--lit { background: var(--grey-500); }
+.meter__bar--lit.meter__bar--over { background: var(--primary); }
+
+.chatbar__note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--danger-ink);
+  background: var(--surface);
+  border: 1px solid var(--danger-ink);
+  border-radius: 12px;
+  padding: 6px 14px;
+}
+.chatbar__hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--grey-700);
+  background: rgb(255 255 255 / 82%);
+  border-radius: 10px;
+  padding: 3px 10px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .meter__bar { transition: none; }
+}
+
+/* Which microphone. Present only when there is more than one to choose from —
+   on a machine with a single input this is furniture. */
+.chatbar__device {
+  font: inherit;
+  font-size: 12px;
+  color: var(--grey-700);
+  background: transparent;
+  border: 1px solid var(--border-control);
+  border-radius: 999px;
+  padding: 5px 8px;
+  max-width: 168px;
+}
+.chatstate--opening { color: var(--grey-700); }
