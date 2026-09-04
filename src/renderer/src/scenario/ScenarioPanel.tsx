@@ -21,7 +21,12 @@ export function ScenarioPanel({
 
   return (
     <div className="scenario">
-      <select className="scenario__select" value={activeId} onChange={(e) => onSelect(e.target.value)}>
+      <select
+        className="scenario__select"
+        aria-label="Practice scenario"
+        value={activeId}
+        onChange={(e) => onSelect(e.target.value)}
+      >
         {scenarios.map((s) => (
           <option key={s.id} value={s.id}>
             {s.title}

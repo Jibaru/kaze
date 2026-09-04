@@ -354,15 +354,22 @@ function Canvas() {
       <aside className="rail rail--right">
         <div className="rail__section rail__section--grow">
           <div className="tabs">
-            <button className={`tab ${tab === 'inspector' ? 'tab--on' : ''}`} onClick={() => setTab('inspector')}>
-              Inspector
-            </button>
-            <button className={`tab ${tab === 'text' ? 'tab--on' : ''}`} onClick={() => setTab('text')}>
-              Design text
-            </button>
-            <button className={`tab ${tab === 'review' ? 'tab--on' : ''}`} onClick={() => setTab('review')}>
-              Review
-            </button>
+            {(
+              [
+                ['inspector', 'Inspector'],
+                ['text', 'Design text'],
+                ['review', 'Review'],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                className={`tab ${tab === id ? 'tab--on' : ''}`}
+                aria-pressed={tab === id}
+                onClick={() => setTab(id)}
+              >
+                {label}
+              </button>
+            ))}
           </div>
           {tab === 'inspector' && (
             <Inspector node={selected} onLabel={setLabel} onProps={setProps} onDelete={removeNode} />
@@ -411,7 +418,8 @@ function Canvas() {
         )}
         <input
           className="ask"
-          placeholder="…or ask a question"
+          aria-label="Ask a question about the current design"
+          placeholder="Ask a question instead"
           value={question}
           disabled={streaming}
           onChange={(e) => setQuestion(e.target.value)}
@@ -425,6 +433,8 @@ function Canvas() {
           <input
             className="ask"
             type="password"
+            aria-label="OpenAI API key, used only for speech"
+            autoComplete="off"
             placeholder="Paste an OpenAI key to enable voice"
             value={keyDraft}
             onChange={(e) => setKeyDraft(e.target.value)}
@@ -441,8 +451,17 @@ function Canvas() {
             }}
           />
         )}
-        <button className="btn btn--ghost" onClick={() => void save()}>
-          Save {dirty ? '•' : ''}
+        <button
+          className="btn btn--ghost"
+          onClick={() => void save()}
+          aria-label={dirty ? 'Save — unsaved changes' : 'Save'}
+        >
+          Save
+          {dirty && (
+            <span className="dot" title="Unsaved changes" aria-hidden>
+              •
+            </span>
+          )}
         </button>
         <button className="btn btn--ghost" onClick={() => void snapshot()}>
           Snapshot revision
@@ -453,7 +472,9 @@ function Canvas() {
         <span className="statusbar__count">
           {serviceCount} services · {edges.length} edges
         </span>
-        <span className="statusbar__msg">{mic.heard ? `“${mic.heard}”` : status}</span>
+        <span className="statusbar__msg" role="status" aria-live="polite">
+          {mic.heard ? `“${mic.heard}”` : status}
+        </span>
       </footer>
     </div>
   )

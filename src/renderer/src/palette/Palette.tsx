@@ -20,6 +20,7 @@ export function Palette({ onAdd }: { onAdd: (spec: ServiceSpec) => void }) {
     <div className="palette">
       <input
         className="palette__search"
+        aria-label="Search AWS services"
         placeholder="Search services — try “redis”, “queue”, “cdn”"
         value={query}
         onChange={(e) => setQuery(e.target.value)}

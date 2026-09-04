@@ -7,9 +7,21 @@
   --line: #232c38;
   --line-strong: #313d4d;
   --text: #e6edf3;
-  --muted: #8b98a5;
+  --muted: #8b98a5;      /* 5.95:1 on --panel */
+  --muted-2: #7b8896;    /* 4.84:1 on --panel, 4.54:1 on --panel-2 — the floor */
+  /* Two steps of one accent ramp, each with a job: --accent is for text and
+     borders on dark surfaces, --accent-solid is for filled backgrounds. White
+     on --accent measures 3.20:1 and fails; on --accent-solid it is 4.70:1. */
   --accent: #4c8dff;
+  --accent-solid: #2f6fe0;
+  --focus: #8fc0ff;      /* 10.05:1 on --bg, so a ring with offset always reads */
   --danger: #f0666b;
+  --warn: #e0a959;
+  --ok: #6bd39b;
+  /* Static references (node ids, config chips) are deliberately NOT the accent:
+     accent means interactive, and blue static text invites a click that does
+     nothing. */
+  --ink-quiet: #b3c2d1;
   --radius: 8px;
   --font: ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, "Cascadia Code", "JetBrains Mono", Consolas, monospace;
@@ -49,8 +61,13 @@ button, input, select { font: inherit; color: inherit; }
 .rail--left { grid-area: left; border-right: 1px solid var(--line); }
 .rail--right { grid-area: right; border-left: 1px solid var(--line); }
 
-.rail__section { padding: 12px 14px; border-bottom: 1px solid var(--line); min-height: 0; }
-.rail__section--grow { flex: 1; display: flex; flex-direction: column; border-bottom: 0; }
+/* Space groups first, lines last. A hairline is kept only where a region
+   scrolls under the next one, because there the line marks a real edge rather
+   than inventing one between sections that whitespace already separates. */
+.rail__section { padding: 16px 14px 0; min-height: 0; }
+.rail__section:last-child { padding-bottom: 14px; }
+.rail__section--scenario { border-bottom: 1px solid var(--line); padding-bottom: 14px; }
+.rail__section--grow { flex: 1; display: flex; flex-direction: column; padding-bottom: 14px; }
 
 .rail__title {
   margin: 0 0 10px;
@@ -65,7 +82,7 @@ button, input, select { font: inherit; color: inherit; }
 
 /* ── buttons ────────────────────────────────────────────────────────────── */
 .btn {
-  background: var(--accent);
+  background: var(--accent-solid);
   border: 1px solid transparent;
   border-radius: 6px;
   padding: 5px 12px;
@@ -79,7 +96,7 @@ button, input, select { font: inherit; color: inherit; }
 .btn--danger { background: transparent; border-color: var(--line-strong); color: var(--danger); width: 100%; margin-top: 12px; }
 .btn--danger:hover { border-color: var(--danger); filter: none; }
 
-.chipbar { display: flex; flex-wrap: wrap; gap: 6px; }
+.chipbar { display: flex; flex-wrap: wrap; gap: 8px; }
 .chipbar .btn { padding: 3px 9px; font-size: 12px; }
 
 /* ── palette ────────────────────────────────────────────────────────────── */
@@ -94,16 +111,16 @@ button, input, select { font: inherit; color: inherit; }
   margin-bottom: 10px;
 }
 .palette__search:focus { outline: none; border-color: var(--accent); }
-.palette__search::placeholder { color: #5c6874; }
+.palette__search::placeholder { color: var(--muted-2); }
 
 .palette__list { overflow-y: auto; flex: 1; margin-right: -6px; padding-right: 6px; }
 
 .palette__category {
   margin: 12px 0 4px;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #5c6874;
+  color: var(--muted-2);
   font-weight: 600;
 }
 
@@ -140,15 +157,15 @@ button, input, select { font: inherit; color: inherit; }
 .node__titles { min-width: 0; }
 .node__label { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .node__service { font-size: 11px; color: var(--muted); }
-.node__id { font-family: var(--mono); color: #55616e; margin-left: 4px; }
+.node__id { font-family: var(--mono); color: var(--muted-2); margin-left: 4px; }
 
 .node__chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
 .chip {
-  font-size: 10.5px;
+  font-size: 11px;
   font-family: var(--mono);
-  background: rgba(76, 141, 255, 0.12);
-  border: 1px solid rgba(76, 141, 255, 0.28);
-  color: #a8c8ff;
+  background: rgba(179, 194, 209, 0.09);
+  border: 1px solid rgba(179, 194, 209, 0.22);
+  color: var(--ink-quiet);
   border-radius: 4px;
   padding: 1px 5px;
 }
@@ -179,15 +196,15 @@ button, input, select { font: inherit; color: inherit; }
   padding: 0 7px;
   font-size: 11px;
 }
-.group__kind { text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; font-size: 10px; }
-.group__label { font-family: var(--mono); color: #6d7986; }
+.group__kind { text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-weight: 600; font-size: 11px; }
+.group__label { font-family: var(--mono); color: var(--muted-2); }
 .group__resize { border-color: var(--accent) !important; }
 .group__handle { background: var(--accent) !important; border-radius: 2px !important; }
 
 /* ── inspector ──────────────────────────────────────────────────────────── */
 .inspector { overflow-y: auto; flex: 1; }
 .inspector--empty { color: var(--muted); }
-.inspector__hint { font-size: 12px; color: #5c6874; }
+.inspector__hint { font-size: 12px; color: var(--muted-2); }
 
 .inspector__head {
   display: flex;
@@ -210,7 +227,7 @@ button, input, select { font: inherit; color: inherit; }
   padding: 6px 9px;
 }
 .field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
-.field input::placeholder { color: #4d5866; }
+.field input::placeholder { color: var(--muted-2); }
 
 .field--check { display: flex; align-items: center; gap: 8px; }
 .field--check > span { margin: 0; font-size: 13px; color: var(--text); }
@@ -225,11 +242,13 @@ button, input, select { font: inherit; color: inherit; }
   padding: 0 12px;
   background: var(--panel);
   border-top: 1px solid var(--line);
+  overflow: hidden;
 }
-.statusbar .btn { padding: 3px 11px; font-size: 12.5px; }
-.statusbar__count { color: var(--muted); font-size: 12px; }
+.statusbar .btn { padding: 4px 11px; font-size: 12.5px; white-space: nowrap; flex: none; }
+.statusbar__count { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .statusbar__msg {
   margin-left: auto;
+  font-variant-numeric: tabular-nums;
   color: var(--muted);
   font-size: 12px;
   font-family: var(--mono);
@@ -252,7 +271,7 @@ button, input, select { font: inherit; color: inherit; }
 .react-flow__handle:hover { background: var(--accent); }
 .react-flow__edge-path { stroke: #4a5867; stroke-width: 1.6; }
 .react-flow__edge.selected .react-flow__edge-path { stroke: var(--accent); }
-.react-flow__edge-text { fill: var(--muted); font-size: 10px; }
+.react-flow__edge-text { fill: var(--muted); font-size: 11px; }
 .react-flow__controls-button {
   background: var(--panel-2);
   border-bottom: 1px solid var(--line);
@@ -261,8 +280,8 @@ button, input, select { font: inherit; color: inherit; }
 .react-flow__controls-button:hover { background: var(--line); }
 .react-flow__minimap { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 6px; }
 .react-flow__minimap-mask { fill: rgba(13, 17, 23, 0.72); }
-.react-flow__attribution { background: transparent; color: #3d4753; }
-.react-flow__attribution a { color: #3d4753; }
+.react-flow__attribution { background: transparent; color: var(--muted-2); }
+.react-flow__attribution a { color: var(--muted-2); }
 
 /* ── tabs & design text ─────────────────────────────────────────────────── */
 .tabs { display: flex; gap: 4px; margin-bottom: 12px; }
@@ -296,7 +315,7 @@ button, input, select { font: inherit; color: inherit; }
   font-family: var(--mono);
   font-size: 11px;
   line-height: 1.55;
-  color: #b8c4d0;
+  color: var(--ink-quiet);
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -307,13 +326,13 @@ button, input, select { font: inherit; color: inherit; }
 
 .badge {
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 11px;
   border-radius: 20px;
   padding: 0 6px;
   letter-spacing: 0;
 }
-.badge--ok { background: rgba(71, 185, 128, 0.15); color: #6bd39b; border: 1px solid rgba(71, 185, 128, 0.3); }
-.badge--warn { background: rgba(224, 158, 62, 0.15); color: #e0a959; border: 1px solid rgba(224, 158, 62, 0.32); }
+.badge--ok { background: rgba(71, 185, 128, 0.15); color: var(--ok); border: 1px solid rgba(71, 185, 128, 0.3); }
+.badge--warn { background: rgba(224, 158, 62, 0.15); color: var(--warn); border: 1px solid rgba(224, 158, 62, 0.32); }
 
 .gaplist { list-style: none; margin: 0; padding: 0; }
 .gaplist__item {
@@ -329,15 +348,15 @@ button, input, select { font: inherit; color: inherit; }
   margin-bottom: 6px;
   cursor: pointer;
 }
-.gaplist__item:hover { background: var(--panel-2); border-left-color: #e0a959; }
+.gaplist__item:hover { background: var(--panel-2); border-left-color: var(--warn); }
 .gaplist__item:disabled { cursor: default; opacity: 0.75; }
 .gaplist__rule {
   display: block;
   font-family: var(--mono);
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #e0a959;
+  color: var(--warn);
 }
 .gaplist__detail { display: block; font-size: 12px; color: var(--muted); line-height: 1.45; }
 
@@ -354,15 +373,15 @@ button, input, select { font: inherit; color: inherit; }
   background: var(--panel-2);
   border-radius: 0 6px 6px 0;
 }
-.verdict--solid { border-left-color: #47b980; }
-.verdict--needs_work { border-left-color: #e0a959; }
+.verdict--solid { border-left-color: var(--ok); }
+.verdict--needs_work { border-left-color: var(--warn); }
 .verdict--does_not_meet_brief { border-left-color: var(--danger); }
 .verdict__label { font-weight: 600; }
 .verdict__rev { font-family: var(--mono); font-size: 11px; color: var(--muted); }
 
 .notice {
   font-size: 12px;
-  color: #e0a959;
+  color: var(--warn);
   border-left: 2px solid #e0a95966;
   padding-left: 8px;
   margin: 0 0 12px;
@@ -385,29 +404,29 @@ button, input, select { font: inherit; color: inherit; }
 .finding:hover { background: var(--panel-2); }
 .finding:disabled { cursor: default; }
 .finding--high { border-left-color: var(--danger); }
-.finding--medium { border-left-color: #e0a959; }
-.finding--low { border-left-color: #5c7a99; }
+.finding--medium { border-left-color: var(--warn); }
+.finding--low { border-left-color: #6d8fb3; }
 
 .finding__meta {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   font-family: var(--mono);
-  font-size: 9.5px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #6d7986;
+  color: var(--muted-2);
   margin-bottom: 4px;
 }
 .finding--high .finding__severity { color: var(--danger); }
-.finding--medium .finding__severity { color: #e0a959; }
-.finding__nodes { color: var(--accent); }
+.finding--medium .finding__severity { color: var(--warn); }
+.finding__nodes { color: var(--ink-quiet); }
 .finding__claim { display: block; font-size: 12.5px; line-height: 1.45; }
 .finding__fix { display: block; font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.45; }
 
 .resolved {
   font-size: 12px;
-  color: #6bd39b;
+  color: var(--ok);
   border-left: 2px solid rgba(71, 185, 128, 0.4);
   padding-left: 8px;
   margin: 0 0 16px;
@@ -416,7 +435,7 @@ button, input, select { font: inherit; color: inherit; }
 .transcript {
   font-size: 12.5px;
   line-height: 1.6;
-  color: #b8c4d0;
+  color: var(--ink-quiet);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -432,7 +451,8 @@ button, input, select { font: inherit; color: inherit; }
 @keyframes pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
 
 .ask {
-  flex: 1;
+  flex: 1 1 140px;
+  min-width: 0;
   max-width: 340px;
   background: var(--bg);
   border: 1px solid var(--line-strong);
@@ -441,7 +461,7 @@ button, input, select { font: inherit; color: inherit; }
   font-size: 12.5px;
 }
 .ask:focus { outline: none; border-color: var(--accent); }
-.ask::placeholder { color: #4d5866; }
+.ask::placeholder { color: var(--muted-2); }
 .btn:disabled { opacity: 0.5; cursor: default; filter: none; }
 
 /* ── scenario ───────────────────────────────────────────────────────────── */
@@ -460,22 +480,22 @@ button, input, select { font: inherit; color: inherit; }
 .scenario__brief { overflow-y: auto; font-size: 12px; line-height: 1.5; color: var(--muted); }
 .scenario__heading {
   margin: 10px 0 4px;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: #5c6874;
+  color: var(--muted-2);
 }
 .scenario__heading:first-child { margin-top: 0; }
 .scenario__bullet { margin: 0 0 4px; padding-left: 10px; text-indent: -10px; }
-.scenario__bullet::before { content: '· '; color: #4d5866; }
+.scenario__bullet::before { content: '· '; color: var(--muted-2); }
 .scenario__text { margin: 0 0 6px; }
 
 /* ── ledger statuses ────────────────────────────────────────────────────── */
 .finding__status { font-weight: 600; }
-.finding__status--new { color: var(--accent); }
-.finding__status--open { color: #6d7986; }
+.finding__status--new { color: var(--text); }
+.finding__status--open { color: var(--muted); }
 .finding__status--regressed { color: var(--danger); }
-.finding__age { color: #6d7986; font-style: italic; }
+.finding__age { color: var(--muted-2); font-style: italic; }
 /* A regression is the loudest thing on the panel: you already fixed this. */
 .finding--status-regressed { border-left-width: 3px; background: rgba(240, 102, 107, 0.05); }
 
@@ -490,12 +510,12 @@ button, input, select { font: inherit; color: inherit; }
   border: 1px solid rgba(71, 185, 128, 0.28);
   border-radius: 6px;
   padding: 5px 10px;
-  color: #6bd39b;
+  color: var(--ok);
   font-size: 12.5px;
   cursor: pointer;
 }
 .fixed__head:hover { background: rgba(71, 185, 128, 0.14); }
-.fixed__note { margin-left: auto; font-size: 10.5px; color: #7d8b98; }
+.fixed__note { margin-left: auto; font-size: 11px; color: var(--muted); }
 .fixed__list { list-style: none; margin: 8px 0 0; padding: 0; }
 .fixed__item {
   display: block;
@@ -514,8 +534,8 @@ button, input, select { font: inherit; color: inherit; }
 .fixed__meta {
   display: block;
   font-family: var(--mono);
-  font-size: 10px;
-  color: #6bd39b;
+  font-size: 11px;
+  color: var(--ok);
   margin-top: 2px;
 }
 
@@ -551,3 +571,37 @@ button, input, select { font: inherit; color: inherit; }
 }
 .mic--transcribing { background: var(--panel-2); border-color: var(--line-strong); color: var(--muted); }
 .statusbar__msg { font-style: normal; }
+
+
+/* ── focus ──────────────────────────────────────────────────────────────
+   Every control in this app was keyboard-reachable and none of them showed
+   it. One rule, :focus-visible so pointer users don't see it, and an offset
+   so the ring is measured against the page background (10:1) rather than
+   against whatever the control is filled with. */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.react-flow__node:focus-visible { outline-offset: 4px; }
+
+/* ── reduced motion ─────────────────────────────────────────────────────
+   The mic ring and the streaming dot loop forever. Anyone who has asked the
+   OS for less motion should not get a permanent pulse in their peripheral
+   vision; state is carried by colour and label regardless. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .pulse { opacity: 1; }
+  .mic--recording::before { opacity: 1; transform: none; }
+}
+
+/* Unsaved-changes marker. The button already carries the state in its
+   accessible name; this is the visual half of the same signal. */
+.dot { color: var(--accent); margin-inline-start: 5px; }

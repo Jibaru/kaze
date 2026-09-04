@@ -77,7 +77,11 @@ export function ReviewPanel({
         </ul>
       )}
 
-      <button className="disclose" onClick={() => setShowTranscript((v) => !v)}>
+      <button
+        className="disclose"
+        aria-expanded={showTranscript || streaming}
+        onClick={() => setShowTranscript((v) => !v)}
+      >
         {showTranscript ? '▾' : '▸'} Transcript {streaming && <span className="pulse" aria-label="streaming" />}
       </button>
       {(showTranscript || streaming) && <div className="transcript">{transcript || '…'}</div>}
@@ -92,7 +96,7 @@ function FixedStrip({ entries, onSelect }: { entries: LedgerEntry[]; onSelect: (
 
   return (
     <div className="fixed">
-      <button className="fixed__head" onClick={() => setExpanded((v) => !v)}>
+      <button className="fixed__head" aria-expanded={expanded} onClick={() => setExpanded((v) => !v)}>
         {expanded ? '▾' : '▸'} Fixed ({entries.length})
         {declared < entries.length && (
           <span className="fixed__note">{entries.length - declared} no longer raised</span>
