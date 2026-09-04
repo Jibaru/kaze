@@ -1175,3 +1175,19 @@ button, input, select { font-family: inherit; font-size: inherit; color: inherit
 @media (prefers-reduced-motion: reduce) {
   .canvasbar__btn:active { scale: 1; }
 }
+
+.canvasbar__sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 6px 2px;
+  background: var(--border-subtle);
+}
+.canvasbar__btn:disabled { color: var(--grey-500); cursor: default; }
+.canvasbar__btn:disabled:hover { background: transparent; }
+
+/* Everything that floats over the canvas is chrome, not design, so it is left
+   out of the photograph. */
+.react-flow.is-capturing .react-flow__panel,
+.react-flow.is-capturing .react-flow__attribution {
+  visibility: hidden;
+}

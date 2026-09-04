@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron'
+import { app, BrowserWindow, clipboard, ipcMain, Menu, shell } from 'electron'
 import { cp, mkdir, writeFile } from 'node:fs/promises'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -144,6 +144,37 @@ ipcMain.handle(
     if ('error' in parsed) return parsed
     const { id } = await writeScenario(workspaceRoot, parsed.markdown, topic)
     return { id }
+  },
+)
+
+/**
+ * Photographs a rectangle of the window and puts it on the clipboard.
+ *
+ * `capturePage` asks the compositor for what it already drew, so anything
+ * visible is in the picture by construction. The DOM-rasterising libraries do
+ * not manage that here: React Flow paints each edge in a small <svg> that
+ * spills outside its own box, which survives on screen and vanishes on
+ * rasterisation — the first attempts produced every node and not one
+ * connection.
+ *
+ * The clipboard is written here rather than with navigator.clipboard because
+ * the renderer is sandboxed and served from file://, where the async clipboard
+ * API is gated behind permissions it will not reliably get.
+ */
+ipcMain.handle(
+  'canvas:capture',
+  async (_e, rect: { x: number; y: number; width: number; height: number }) => {
+    if (!win) throw new Error('no window')
+    const image = await win.webContents.capturePage({
+      x: Math.round(rect.x),
+      y: Math.round(rect.y),
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+    })
+    if (image.isEmpty()) throw new Error('the captured image was empty')
+    clipboard.writeImage(image)
+    const size = image.getSize()
+    return { width: size.width, height: size.height }
   },
 )
 

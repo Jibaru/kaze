@@ -60,6 +60,21 @@ function BackgroundIcon({ style }: { style: BackgroundStyle }) {
   )
 }
 
+function CameraIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden focusable="false">
+      <path
+        d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="13" r="3.4" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  )
+}
+
 /**
  * How the canvas is drawn, on the canvas itself rather than in a rail. These
  * are view settings, not part of the design: the reviewer never sees them, and
@@ -68,9 +83,13 @@ function BackgroundIcon({ style }: { style: BackgroundStyle }) {
 export function CanvasOptions({
   view,
   onChange,
+  onCopyImage,
+  canCopy,
 }: {
   view: ViewOptions
   onChange: (next: Partial<ViewOptions>) => void
+  onCopyImage: () => void
+  canCopy: boolean
 }) {
   const t = useT()
 
@@ -102,6 +121,18 @@ export function CanvasOptions({
         title={backgroundLabel}
       >
         <BackgroundIcon style={view.background} />
+      </button>
+
+      <span className="canvasbar__sep" aria-hidden />
+
+      <button
+        className="canvasbar__btn"
+        onClick={onCopyImage}
+        disabled={!canCopy}
+        aria-label={t.copyImage}
+        title={t.copyImage}
+      >
+        <CameraIcon />
       </button>
     </Panel>
   )

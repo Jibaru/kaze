@@ -38,6 +38,10 @@ export interface Dict {
   background: string
   backgroundName: Record<string, string>
   cycleTo: (name: string) => string
+  copyImage: string
+  imageCopied: (width: number, height: number) => string
+  nothingToCopy: string
+  copyFailed: (reason: string) => string
   noScenarios: string
   scenarioLabel: string
   newScenario: string
@@ -166,6 +170,10 @@ const es: Dict = {
   background: 'Fondo',
   backgroundName: { dots: 'Puntos', grid: 'Cuadrícula', none: 'Liso' },
   cycleTo: (name) => `pulsa para cambiar a ${name.toLowerCase()}`,
+  copyImage: 'Copiar el diagrama como imagen',
+  imageCopied: (w, h) => `Diagrama copiado al portapapeles · ${w}×${h}`,
+  nothingToCopy: 'No hay nada que copiar todavía.',
+  copyFailed: (reason) => `No se pudo copiar el diagrama: ${reason}`,
   noScenarios: 'No hay escenarios en el espacio de trabajo.',
   scenarioLabel: 'Escenario de práctica',
   newScenario: 'Nuevo escenario',
@@ -405,6 +413,10 @@ const en: Dict = {
   background: 'Background',
   backgroundName: { dots: 'Dots', grid: 'Grid', none: 'Plain' },
   cycleTo: (name) => `click for ${name.toLowerCase()}`,
+  copyImage: 'Copy the diagram as an image',
+  imageCopied: (w, h) => `Diagram copied to the clipboard · ${w}×${h}`,
+  nothingToCopy: 'Nothing to copy yet.',
+  copyFailed: (reason) => `Could not copy the diagram: ${reason}`,
   noScenarios: 'No scenarios found in the workspace.',
   scenarioLabel: 'Practice scenario',
   newScenario: 'New scenario',

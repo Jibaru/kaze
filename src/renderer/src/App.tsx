@@ -70,7 +70,7 @@ function Canvas() {
   const [keyDraft, setKeyDraft] = useState('')
   const [dirty, setDirty] = useState(false)
   const wrapper = useRef<HTMLDivElement>(null)
-  const { screenToFlowPosition, fitView } = useReactFlow()
+  const { screenToFlowPosition, fitView, getViewport, setViewport } = useReactFlow()
   const nodesInitialized = useNodesInitialized()
   const hasFitted = useRef(false)
 
@@ -186,6 +186,53 @@ function Canvas() {
     },
     [t],
   )
+
+  /**
+   * The whole diagram, not the visible part of the window.
+   *
+   * Everything is fitted into view first, then the canvas rectangle is
+   * photographed by the compositor. Rasterising the DOM was tried twice and
+   * lost every edge both times: React Flow paints each connection in a small
+   * <svg> that spills outside its own box, which holds on screen and does not
+   * survive rasterisation. Asking for what is already drawn cannot have that
+   * class of gap.
+   */
+  const copyImage = useCallback(async () => {
+    const pane = document.querySelector<HTMLElement>('.react-flow')
+    if (!pane || nodes.length === 0) {
+      setStatus(t.nothingToCopy)
+      return
+    }
+
+    // The overlays are chrome, not design. Hidden through a class rather than
+    // inline styles, which React can overwrite on its next render.
+    const previousViewport = getViewport()
+    pane.classList.add('is-capturing')
+    fitView({ padding: 0.12, duration: 0 })
+
+    // Two frames for the fit and the class to be painted, then a beat for the
+    // compositor to commit them. `capturePage` reads the composited frame, so
+    // without the pause it photographs the toolbar it was told to hide — which
+    // is exactly what the first version did.
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    await new Promise((resolve) => setTimeout(resolve, 120))
+
+    try {
+      const box = pane.getBoundingClientRect()
+      const size = await window.kaze.captureCanvas({
+        x: box.x,
+        y: box.y,
+        width: box.width,
+        height: box.height,
+      })
+      setStatus(t.imageCopied(size.width, size.height))
+    } catch (err) {
+      setStatus(t.copyFailed(err instanceof Error ? err.message : String(err)))
+    } finally {
+      pane.classList.remove('is-capturing')
+      setViewport(previousViewport)
+    }
+  }, [nodes, t, fitView, getViewport, setViewport])
 
   const selectNodes = useCallback(
     (ids: string[]) => {
@@ -395,7 +442,15 @@ function Canvas() {
               <Background id="major" variant={BackgroundVariant.Lines} gap={110} lineWidth={1} color="#dadce0" />
             </>
           )}
-          <CanvasOptions view={view} onChange={(next) => { setView((v) => ({ ...v, ...next })); markDirty() }} />
+          <CanvasOptions
+            view={view}
+            onChange={(next) => {
+              setView((v) => ({ ...v, ...next }))
+              markDirty()
+            }}
+            onCopyImage={() => void copyImage()}
+            canCopy={nodes.length > 0}
+          />
           <Controls showInteractive={false} />
           <MiniMap pannable zoomable maskColor="rgba(241,243,244,0.75)" nodeColor="#dadce0" nodeStrokeColor="#9aa0a6" />
         </ReactFlow>
