@@ -505,8 +505,14 @@ ipcMain.handle('chat:open', async (_e, diagram: Diagram, speed = 1): Promise<Cha
   )
 })
 
-ipcMain.handle('chat:say', (_e, said: string, refused: string[] = [], speed = 1): Promise<ChatTurn> =>
-  chatTurn(conversationTurn(said, refused), false, speed),
+ipcMain.handle(
+  'chat:say',
+  // The diagram comes back every turn because the ids are the app's to assign
+  // and the model has no other way to learn them — see `canvasInventory`.
+  async (_e, said: string, refused: string[], speed: number, diagram: Diagram): Promise<ChatTurn> => {
+    await store.saveDiagram(diagram, ATTEMPT)
+    return chatTurn(conversationTurn(said, refused, diagram), false, speed)
+  },
 )
 
 // Leaving the mode lets the process go. Holding a CLI open for a conversation

@@ -558,7 +558,10 @@ function Canvas() {
   const applyOps = useCallback(
     (ops: PatchOp[]): string[] => {
       if (ops.length === 0) return []
-      const result = applyPatch(diagramRef.current, ops)
+      // Duplicates refused here and nowhere else: in a conversation the model
+      // draws from memory across turns, and a missed reference used to come
+      // back as a second copy of everything.
+      const result = applyPatch(diagramRef.current, ops, { refuseDuplicates: true })
       if (result.applied.length > 0) {
         const flow = toFlow(result.diagram)
         setNodes(flow.nodes)
@@ -587,7 +590,7 @@ function Canvas() {
       const refused = chatRef.current?.refused ?? []
       setChat((c) => (c ? { ...c, busy: true } : c))
       window.kaze
-        .sayToChat(said, refused, speechRate.rate)
+        .sayToChat(said, refused, speechRate.rate, diagramRef.current)
         .then(landChatTurn)
         .catch((err: Error) => {
           setStatus(err.message)

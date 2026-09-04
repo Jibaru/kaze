@@ -16,12 +16,13 @@ import type { ScenarioSource } from './scenarios'
  *
  *   - It runs on the fast profile. No tools, no skill, no MCP server, no
  *     thinking — see `fast-review.ts`.
- *   - The diagram is sent **once**, when you enter. After that the model is the
- *     only thing changing it, so its own conversation already holds the current
- *     state and re-sending it every turn would pay for the same tokens twice.
- *     The exception is an operation the app refused, which it is told about
- *     because otherwise it would carry on referring to a node that was never
- *     drawn.
+ *   - Every turn carries a compact inventory of what is on the canvas. This
+ *     started out as "send the diagram once, the model is the only thing
+ *     changing it" — which was wrong for one reason: the *app* assigns node
+ *     ids, and never told it what they were. So it guessed. It would name its
+ *     own alias `n6`, refer to `n2` on the next turn, miss, watch its
+ *     structure fail to appear, and draw the whole thing again. Ids are cheap;
+ *     duplicates are not.
  *   - The spoken half comes first and the operations after, so the app can
  *     start synthesizing speech the moment the fence opens instead of waiting
  *     for the json to finish. That is about two seconds of a seven-second turn.
@@ -58,7 +59,9 @@ ${OPS}
 Rules that matter:
 
 - \`service\` must be an exact service id from the design you were given, or one of the obvious AWS ones (ALB, NLB, APIGateway, Lambda, ECS, Fargate, EC2, RDS, Aurora, DynamoDB, ElastiCache, S3, SQS, SNS, Kinesis, CloudFront, Route53, WAF, Cognito, EFS, OpenSearch, Redshift, Glue, Athena, EventBridge, StepFunctions, SecretsManager, KMS, CloudWatch, Actor, Custom). The app refuses anything it does not model and will tell you.
-- \`as\` names something you add so later operations in the same reply can wire it up. \`from\` initiates, \`to\` receives.
+- **Use the ids from the inventory.** Every turn lists what is on the canvas with its real ids. Those are assigned by the app, not by you: never invent one, never assume the next one, and never re-add something that is already listed — connect to it by its id instead.
+- \`as\` is a nickname for something you add *in this same reply*, so a later operation in the same reply can wire it up. It is not an id and it does not survive the turn, so make it a word (\`cache\`, \`queue\`), never something id-shaped like \`n6\`.
+- \`from\` initiates, \`to\` receives.
 - Do not send positions. The app places nodes.
 - **Draw only what was just agreed.** One or two boxes a turn. Running ahead and rendering the whole architecture takes the exercise away from them — the point is that they decide, and you ask the question that makes them decide well.
 - Suggest, do not lecture. After you draw, name the one thing that is now missing or now risky, as a question.
@@ -99,11 +102,40 @@ export function conversationOpening({ scenario, diagram, locale }: ConversationC
  * the opening, and re-stating it every turn would be paying twice for the same
  * context and making them wait for it.
  */
-export function conversationTurn(said: string, refused: string[]): string {
+export function conversationTurn(said: string, refused: string[], diagram: Diagram): string {
   const note = refused.length
     ? `\n\n(The app refused part of your last reply, so it is not on the canvas: ${refused.join('; ')}. Work from that, and do not refer to anything in it as drawn.)`
     : ''
-  return `${said}${note}`
+  return `${canvasInventory(diagram)}\n\n# They said\n\n${said}${note}`
+}
+
+/**
+ * What is on the canvas, in the fewest words that still name everything.
+ *
+ * Not the full kaze-adl: this goes out every turn, and the properties and the
+ * computed gaps are for reviewing a finished design, not for knowing which box
+ * to connect to. Ids, services, labels, containment, connections — the things
+ * an operation can refer to, and nothing else.
+ */
+export function canvasInventory(diagram: Diagram): string {
+  if (diagram.nodes.length === 0 && diagram.groups.length === 0) {
+    return '# On the canvas now\n\nNothing yet.'
+  }
+
+  const lines: string[] = []
+  for (const g of diagram.groups) {
+    lines.push(`${g.id}  boundary ${g.kind}  "${g.label}"${g.parentId ? `  in ${g.parentId}` : ''}`)
+  }
+  for (const n of diagram.nodes) {
+    lines.push(`${n.id}  ${n.serviceId}  "${n.label}"${n.parentId ? `  in ${n.parentId}` : ''}`)
+  }
+  if (diagram.edges.length) {
+    lines.push('')
+    for (const e of diagram.edges) {
+      lines.push(`${e.from} -> ${e.to}${e.protocol ? `  (${e.protocol})` : ''}`)
+    }
+  }
+  return `# On the canvas now\n\n${lines.join('\n')}`
 }
 
 /**

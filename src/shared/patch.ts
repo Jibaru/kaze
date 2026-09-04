@@ -128,7 +128,30 @@ function allowedProps(serviceId: string, props: NodeProps): { kept: NodeProps; d
   return { kept, dropped }
 }
 
-export function applyPatch(diagram: Diagram, ops: PatchOp[]): PatchResult {
+export interface ApplyOptions {
+  /**
+   * Refuse a node that is already on the canvas, naming the one that is there.
+   *
+   * On for conversation mode, where the model is drawing from memory across
+   * turns and a missed reference used to come back as a second copy of
+   * everything. The refusal is the useful half: it is handed to the next turn,
+   * so "already on the canvas as n4" teaches the id that guessing did not.
+   *
+   * Off for an autofix, where a patch is one considered change to a design you
+   * arranged, and a second Lambda beside the first may well be the point.
+   */
+  refuseDuplicates?: boolean
+}
+
+/** Same service, same name, is a re-draw and not a second instance. */
+const sameThing = (a: { serviceId: string; label: string }, service: string, label?: string): boolean =>
+  a.serviceId === service && a.label.trim().toLowerCase() === (label ?? '').trim().toLowerCase()
+
+export function applyPatch(
+  diagram: Diagram,
+  ops: PatchOp[],
+  options: ApplyOptions = {},
+): PatchResult {
   const nodes: DiagramNode[] = diagram.nodes.map((n) => ({ ...n, props: { ...n.props } }))
   const groups = diagram.groups.map((g) => ({ ...g }))
   const edges: DiagramEdge[] = diagram.edges.map((e) => ({ ...e }))
@@ -170,6 +193,18 @@ export function applyPatch(diagram: Diagram, ops: PatchOp[]): PatchResult {
         if (!getService(op.service)) {
           reject(`unknown service: ${op.service}`)
           break
+        }
+        if (options.refuseDuplicates) {
+          const label = op.label?.trim() || getService(op.service)!.name
+          const existing = nodes.find((n) => sameThing(n, op.service, label))
+          if (existing) {
+            // Named, not just refused: this reason is read by the next turn.
+            reject(`${op.service} "${label}" is already on the canvas as ${existing.id}`)
+            // The alias still resolves, so the rest of the reply wires up to
+            // the node that is actually there instead of falling apart.
+            if (op.as) aliases.set(op.as, existing.id)
+            break
+          }
         }
         const anchor = op.near ? findNode(op.near) : undefined
         const id = nextId(ids, 'n')

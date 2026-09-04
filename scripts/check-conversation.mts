@@ -14,6 +14,7 @@ import {
   CONVERSATION_SYSTEM,
   conversationOpening,
   conversationTurn,
+  canvasInventory,
   spokenHalf,
   spokenHalfComplete,
 } from '../src/main/conversation.ts'
@@ -65,12 +66,53 @@ try {
   check('a missing brief is admitted rather than invented', noBrief.includes('no brief on file'))
 
   // ── a turn ─────────────────────────────────────────────────────────────
-  check('an ordinary turn is just what was said: the model already holds the design',
-    conversationTurn('añade una caché', []) === 'añade una caché')
+  // The app assigns node ids and the model has no other way to learn them.
+  // Left to guess, it guessed — and a wrong id is an operation that quietly
+  // does nothing, which it answers by drawing the whole design again.
+  const turn = conversationTurn('añade una caché', [], started)
+  check('a turn carries what was said', turn.includes('añade una caché'))
+  check('and the real ids of everything on the canvas',
+    turn.includes('n1') && turn.includes('n2') && turn.includes('ALB'))
+  check('and the connections between them', turn.includes('n1 -> n2'))
+  check('an empty canvas says so rather than listing nothing',
+    conversationTurn('empecemos', [], empty).includes('Nothing yet'))
   check('a refusal is passed on, or it keeps talking about a box that is not there',
-    conversationTurn('y ahora?', ['unknown service: Memcached']).includes('unknown service: Memcached'))
+    conversationTurn('y ahora?', ['unknown service: Memcached'], started).includes('unknown service: Memcached'))
   check('and the refusal is marked as not drawn',
-    conversationTurn('y ahora?', ['x']).includes('not on the canvas'))
+    conversationTurn('y ahora?', ['x'], started).includes('not on the canvas'))
+
+  const inventory = canvasInventory({
+    ...started,
+    groups: [{ id: 'az-a', kind: 'az', label: 'eu-west-1a', x: 0, y: 0, width: 400, height: 300 }],
+    nodes: started.nodes.map((n) => (n.id === 'n2' ? { ...n, parentId: 'az-a' } : n)),
+  })
+  check('boundaries are listed too: move_node needs their ids', inventory.includes('az-a'))
+  check('and which box is inside which', /n2.*in az-a/.test(inventory), inventory)
+  check('the inventory carries labels, so it can talk about them by name',
+    inventory.includes('"urls"'))
+  check('but not the properties or the gaps: this is for wiring, not reviewing',
+    !inventory.includes('gaps:') && !inventory.includes('multi_az'))
+  check('it tells the model the ids are not its to invent',
+    CONVERSATION_SYSTEM.includes('never invent one') && CONVERSATION_SYSTEM.includes('never re-add'))
+  check('and that an alias is a word, not an id',
+    CONVERSATION_SYSTEM.includes('never something id-shaped'))
+
+  // ── the same thing twice ───────────────────────────────────────────────
+  const again = [{ op: 'add_node', service: 'ALB', label: 'edge', as: 'lb' },
+                 { op: 'add_edge', from: 'lb', to: 'n2', protocol: 'SQL' }]
+  const dup = applyPatch(started, parsePatch(again), { refuseDuplicates: true })
+  check('a node that is already there is refused rather than drawn twice',
+    dup.diagram.nodes.length === 2, String(dup.diagram.nodes.length))
+  check('and the refusal names the one that is there, which is how the id gets learned',
+    dup.rejected[0]?.reason.includes('n1') === true, dup.rejected[0]?.reason)
+  check('the rest of the reply still wires up, to the node that exists',
+    dup.diagram.edges.some((e) => e.from === 'n1' && e.to === 'n2' && e.protocol === 'SQL'),
+    JSON.stringify(dup.diagram.edges))
+  check('a genuinely different label is not a duplicate',
+    applyPatch(started, parsePatch([{ op: 'add_node', service: 'ALB', label: 'edge interno' }]),
+      { refuseDuplicates: true }).diagram.nodes.length === 3)
+  check('and an autofix is left alone: a second Lambda beside the first may be the point',
+    applyPatch(started, parsePatch([{ op: 'add_node', service: 'ALB', label: 'edge' }])).diagram.nodes.length === 3)
 
   // ── splitting the reply ────────────────────────────────────────────────
   const full = reply('Añadí un balanceador delante. ¿Dónde guardas los códigos?', '[]')

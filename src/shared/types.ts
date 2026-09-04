@@ -237,7 +237,14 @@ export interface KazeApi {
    * the audio afterwards, so the voice keeps its pitch and there is less of it
    * to wait for.
    */
-  sayToChat(said: string, refused: string[], speed: number): Promise<ChatTurn>
+  sayToChat(
+    said: string,
+    refused: string[],
+    speed: number,
+    /** What is on the canvas now. The app assigns node ids, so this is the
+     *  only way the model learns them. */
+    diagram: Diagram,
+  ): Promise<ChatTurn>
   /** Streamed speech for conversation mode. Returns the unsubscribe. */
   onChatAudio(handler: (audio: ChatAudio) => void): () => void
   /** Leaving the mode: lets go of the process it was holding open. */
