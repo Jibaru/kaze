@@ -32,6 +32,8 @@ export function ReviewPanel({
   revision,
   problem,
   onSelect,
+  onApplyFix,
+  fixing,
 }: {
   streaming: boolean
   transcript: string
@@ -40,6 +42,10 @@ export function ReviewPanel({
   revision: number | null
   problem: ReviewProblem | null
   onSelect: (ids: string[]) => void
+  /** Ask the model for the change this finding calls for, and apply it. */
+  onApplyFix: (entry: LedgerEntry) => void
+  /** Id of the finding currently being worked on, if any. */
+  fixing: string | null
 }) {
   const t = useT()
   const [showTranscript, setShowTranscript] = useState(false)
@@ -73,7 +79,13 @@ export function ReviewPanel({
         <ul className="findings">
           {open.map((entry) => (
             <li key={entry.id}>
-              <FindingRow entry={entry} onSelect={onSelect} t={t} />
+              <FindingRow
+                entry={entry}
+                onSelect={onSelect}
+                t={t}
+                onApplyFix={onApplyFix}
+                fixing={fixing === entry.id}
+              />
             </li>
           ))}
         </ul>
@@ -126,15 +138,28 @@ function FixedStrip({ entries, onSelect, t }: { entries: LedgerEntry[]; onSelect
   )
 }
 
-function FindingRow({ entry, onSelect, t }: { entry: LedgerEntry; onSelect: (ids: string[]) => void; t: Dict }) {
+function FindingRow({
+  entry,
+  onSelect,
+  t,
+  onApplyFix,
+  fixing,
+}: {
+  entry: LedgerEntry
+  onSelect: (ids: string[]) => void
+  t: Dict
+  onApplyFix: (entry: LedgerEntry) => void
+  fixing: boolean
+}) {
   const age = entry.lastSeenRevision - entry.firstSeenRevision
 
   return (
-    <button
-      className={`finding finding--${entry.severity} finding--status-${entry.status}`}
-      onClick={() => onSelect(entry.nodes)}
-      disabled={entry.nodes.length === 0}
-    >
+    <div className={`finding finding--${entry.severity} finding--status-${entry.status}`}>
+      <button
+        className="finding__body"
+        onClick={() => onSelect(entry.nodes)}
+        disabled={entry.nodes.length === 0}
+      >
       <span className="finding__meta">
         <span className={`finding__status finding__status--${entry.status}`}>{statusLabel(t, entry.status)}</span>
         <span className="finding__severity">{entry.severity}</span>
@@ -144,7 +169,14 @@ function FindingRow({ entry, onSelect, t }: { entry: LedgerEntry; onSelect: (ids
         {age > 0 && <span className="finding__age">{t.unfixedFor(age)}</span>}
       </span>
       <span className="finding__claim">{entry.claim}</span>
-      {entry.fix && <span className="finding__fix">{entry.fix}</span>}
-    </button>
+        {entry.fix && <span className="finding__fix">{entry.fix}</span>}
+      </button>
+
+      {entry.fix && (
+        <button className="finding__apply" onClick={() => onApplyFix(entry)} disabled={fixing}>
+          {fixing ? t.applyingFix : t.applyFix}
+        </button>
+      )}
+    </div>
   )
 }

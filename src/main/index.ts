@@ -7,7 +7,8 @@ import { SessionManager } from './session-manager'
 import { VoiceService } from './voice-service'
 import { listScenarios } from './scenarios'
 import { authorPrompt, parseAuthored, writeScenario } from './scenario-author'
-import { parseReview, REPAIR_PROMPT } from '../shared/findings'
+import { lastFencedJson, parseReview, REPAIR_PROMPT } from '../shared/findings'
+import { parsePatch, type PatchOp } from '../shared/patch'
 import { dict, REPLY_LANGUAGE, SPEECH_LANGUAGE, toLocale, type Locale } from '../shared/i18n'
 import { reconcile } from '../shared/ledger'
 import type { Diagram, ReviewEvent, ReviewOutcome, TurnIntent } from '../shared/types'
@@ -184,6 +185,42 @@ ipcMain.handle('locale:set', async (_e, locale: Locale) => {
 })
 
 ipcMain.handle('review:cancel', () => session.cancel())
+
+/**
+ * Ask for the change one finding calls for, as operations rather than as a new
+ * design. The model proposes; the renderer validates and applies. Letting it
+ * hand back a whole diagram would make every fix an unreviewable rewrite, and
+ * would quietly move the thing being graded out from under the person
+ * practising.
+ */
+ipcMain.handle('review:fix', async (_e, claim: string, fix: string): Promise<PatchOp[]> => {
+  const locale = currentLocale()
+  const prompt = `Read design.md. Apply exactly this one finding, and nothing else:
+
+FINDING: ${claim}
+SUGGESTED FIX: ${fix}
+
+Reply with ONE fenced json block holding an array of operations and no other
+text. The available operations, and their only shapes:
+
+  { "op": "set_props", "node": "n5", "props": { "multi_az": true } }
+  { "op": "add_node", "service": "ElastiCache", "label": "cache", "near": "n3", "as": "cache" }
+  { "op": "add_boundary", "kind": "az", "label": "eu-west-1b", "as": "azb" }
+  { "op": "add_edge", "from": "n3", "to": "cache", "protocol": "RESP" }
+  { "op": "remove_edge", "from": "n3", "to": "n5" }
+  { "op": "set_protocol", "from": "n2", "to": "n3", "protocol": "HTTPS" }
+  { "op": "move_node", "node": "n9", "into": "azb" }
+
+Rules: use the exact service ids and property keys from design.md; \`as\` names
+something you add so later operations can reference it; \`from\` initiates and
+\`to\` receives. Do not delete nodes and do not restructure anything the finding
+did not ask about. Make the smallest change that answers it.
+
+${REPLY_LANGUAGE[locale]}`
+
+  const reply = await session.send(prompt, 'ask')
+  return parsePatch(lastFencedJson(reply))
+})
 
 ipcMain.handle('voice:has-key', () => voice.hasKey())
 ipcMain.handle('voice:set-key', (_e, key: string) => voice.setKey(key))

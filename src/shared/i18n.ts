@@ -42,6 +42,13 @@ export interface Dict {
   flipEdge: string
   flipEdgeHint: string
   edgesFlipped: (n: number) => string
+  applyFix: string
+  applyingFix: string
+  fixApplied: (changes: string) => string
+  fixRejected: (reason: string) => string
+  fixNothing: string
+  undo: string
+  undone: string
   imageCopied: (width: number, height: number) => string
   nothingToCopy: string
   copyFailed: (reason: string) => string
@@ -177,6 +184,13 @@ const es: Dict = {
   flipEdge: 'Invertir el sentido de la conexión',
   flipEdgeHint: 'Selecciona una conexión para invertirla',
   edgesFlipped: (n) => `${n} ${n === 1 ? 'conexión invertida' : 'conexiones invertidas'}`,
+  applyFix: 'Aplicar',
+  applyingFix: 'Aplicando…',
+  fixApplied: (changes) => `Aplicado: ${changes}`,
+  fixRejected: (reason) => `Se descartó parte del cambio: ${reason}`,
+  fixNothing: 'El modelo no propuso ningún cambio aplicable.',
+  undo: 'Deshacer',
+  undone: 'Cambio deshecho.',
   imageCopied: (w, h) => `Diagrama copiado al portapapeles · ${w}×${h}`,
   nothingToCopy: 'No hay nada que copiar todavía.',
   copyFailed: (reason) => `No se pudo copiar el diagrama: ${reason}`,
@@ -423,6 +437,13 @@ const en: Dict = {
   flipEdge: 'Reverse the connection',
   flipEdgeHint: 'Select a connection to reverse it',
   edgesFlipped: (n) => `${n} connection${n === 1 ? '' : 's'} reversed`,
+  applyFix: 'Apply',
+  applyingFix: 'Applying…',
+  fixApplied: (changes) => `Applied: ${changes}`,
+  fixRejected: (reason) => `Part of the change was refused: ${reason}`,
+  fixNothing: 'The model proposed nothing that could be applied.',
+  undo: 'Undo',
+  undone: 'Change undone.',
   imageCopied: (w, h) => `Diagram copied to the clipboard · ${w}×${h}`,
   nothingToCopy: 'Nothing to copy yet.',
   copyFailed: (reason) => `Could not copy the diagram: ${reason}`,

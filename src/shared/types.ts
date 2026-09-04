@@ -189,6 +189,8 @@ export interface KazeApi {
   /** Snapshots the design, then runs one turn against it. */
   review(diagram: Diagram, intent: TurnIntent, question?: string): Promise<ReviewOutcome>
   cancelTurn(): Promise<void>
+  /** Operations that answer one finding. The renderer validates and applies them. */
+  proposeFix(claim: string, fix: string): Promise<import('./patch').PatchOp[]>
   hasVoiceKey(): Promise<boolean>
   setVoiceKey(key: string): Promise<void>
   transcribe(audio: ArrayBuffer, mimeType: string): Promise<string>

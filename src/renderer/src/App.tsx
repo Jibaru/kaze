@@ -19,8 +19,9 @@ import {
 import '@xyflow/react/dist/style.css'
 import type { GroupKind, NodeProps as ConfigProps, ReviewOutcome, Scenario, TurnIntent } from '@shared/types'
 import type { ReviewProblem } from '@shared/findings'
+import type { LedgerEntry } from '@shared/ledger'
 import { LOCALE_NAMES, LOCALES, type Locale } from '@shared/i18n'
-import { emptyDiagram } from '@shared/types'
+import { emptyDiagram, type Diagram } from '@shared/types'
 import { getService, type ServiceSpec } from '@shared/services'
 import { ServiceNode } from './canvas/ServiceNode'
 import { GroupNode } from './canvas/GroupNode'
@@ -28,6 +29,7 @@ import { CanvasOptions } from './canvas/CanvasOptions'
 import { Palette } from './palette/Palette'
 import { ScenarioPanel } from './scenario/ScenarioPanel'
 import { Inspector } from './inspector/Inspector'
+import { applyPatch } from '@shared/patch'
 import { DesignText } from './review/DesignText'
 import { ReviewPanel } from './review/ReviewPanel'
 import { usePushToTalk } from './voice/usePushToTalk'
@@ -69,6 +71,9 @@ function Canvas() {
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [scenarioId, setScenarioId] = useState('')
   const [view, setView] = useState<ViewOptions>(DEFAULT_VIEW)
+  const [fixing, setFixing] = useState<string | null>(null)
+  /** The diagram as it was before the last applied fix, for a single undo. */
+  const [beforeFix, setBeforeFix] = useState<Diagram | null>(null)
   const [hasVoiceKey, setHasVoiceKey] = useState(false)
   const [keyDraft, setKeyDraft] = useState('')
   const [dirty, setDirty] = useState(false)
@@ -255,6 +260,53 @@ function Canvas() {
       setViewport(previousViewport)
     }
   }, [nodes, t, fitView, getViewport, setViewport])
+
+  /**
+   * Apply the change one finding calls for.
+   *
+   * The model proposes operations and the app validates and applies them, so a
+   * fix can be read in the diagram rather than taken on trust. The finding is
+   * left open: whether it is actually resolved is for the next review to say,
+   * which is the same rule the ledger already lives by.
+   */
+  const applyFix = useCallback(
+    async (entry: LedgerEntry) => {
+      setFixing(entry.id)
+      setStatus(t.applyingFix)
+      try {
+        const ops = await window.kaze.proposeFix(entry.claim, entry.fix)
+        const result = applyPatch(diagram, ops)
+        if (result.applied.length === 0) {
+          setStatus(result.rejected[0] ? t.fixRejected(result.rejected[0].reason) : t.fixNothing)
+          return
+        }
+        setBeforeFix(diagram)
+        const flow = toFlow(result.diagram)
+        setNodes(flow.nodes)
+        setEdges(flow.edges)
+        markDirty()
+        setStatus(
+          result.rejected.length > 0
+            ? `${t.fixApplied(result.applied.join(' · '))} — ${t.fixRejected(result.rejected[0]!.reason)}`
+            : t.fixApplied(result.applied.join(' · ')),
+        )
+      } catch (err) {
+        setStatus(err instanceof Error ? err.message : String(err))
+      } finally {
+        setFixing(null)
+      }
+    },
+    [diagram, setNodes, setEdges, markDirty, t],
+  )
+
+  const undoFix = useCallback(() => {
+    if (!beforeFix) return
+    const flow = toFlow(beforeFix)
+    setNodes(flow.nodes)
+    setEdges(flow.edges)
+    setBeforeFix(null)
+    setStatus(t.undone)
+  }, [beforeFix, setNodes, setEdges, t])
 
   const selectedEdgeIds = useMemo(
     () => new Set(edges.filter((e) => e.selected).map((e) => e.id)),
@@ -528,6 +580,8 @@ function Canvas() {
               revision={outcome?.revision ?? null}
               problem={(outcome?.problem as ReviewProblem | undefined) ?? null}
               onSelect={selectNodes}
+              onApplyFix={(entry) => void applyFix(entry)}
+              fixing={fixing}
             />
           )}
         </div>
@@ -598,6 +652,11 @@ function Canvas() {
         <button className="btn btn--ghost" onClick={() => void snapshot()}>
           {t.snapshot}
         </button>
+        {beforeFix && (
+          <button className="btn btn--ghost" onClick={undoFix}>
+            {t.undo}
+          </button>
+        )}
         <button className="btn btn--ghost" onClick={() => void load()}>
           {t.reload}
         </button>

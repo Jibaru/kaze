@@ -1220,3 +1220,38 @@ button, input, select { font-family: inherit; font-size: inherit; color: inherit
 .react-flow.is-capturing .react-flow__attribution {
   visibility: hidden;
 }
+
+/* A finding is a row you can click to highlight and a button you can press to
+   act on. The two are separate targets so one never swallows the other. */
+.finding { display: flex; align-items: flex-start; gap: 12px; }
+.finding__body {
+  flex: 1;
+  min-width: 0;
+  display: block;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+.finding__body:disabled { cursor: default; }
+
+.finding__apply {
+  flex: none;
+  align-self: center;
+  min-height: 32px;
+  padding: 0 14px;
+  background: transparent;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-pill);
+  color: var(--primary);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.finding__apply:hover { background: var(--primary-tint); color: var(--primary-hover); }
+.finding__apply:disabled { color: var(--grey-700); border-color: var(--border); cursor: default; }

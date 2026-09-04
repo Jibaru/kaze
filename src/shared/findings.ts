@@ -163,6 +163,25 @@ export function parseReview(text: string): ParsedReview {
   }
 }
 
+/**
+ * The last fenced block that parses as JSON, whatever it holds.
+ *
+ * `parseReview` only accepts a findings payload; a patch is a bare array, so it
+ * needs the same fence handling without the shape check. One regex, one set of
+ * lessons about what a fence can look like.
+ */
+export function lastFencedJson(text: string): unknown {
+  const blocks = [...text.matchAll(FENCED)].map((m) => m[1]!)
+  for (const body of blocks.reverse()) {
+    try {
+      return JSON.parse(body)
+    } catch {
+      // Try the next block up.
+    }
+  }
+  return null
+}
+
 /** One corrective turn is worth trying before giving up on the block. */
 export const REPAIR_PROMPT =
   'Your last reply did not end with a valid findings block. Re-emit ONLY the fenced ```json block described in the kaze-review skill, for the review you just gave. No other text.'
