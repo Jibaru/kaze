@@ -16,7 +16,14 @@ import { useT } from '../i18n/useLocale'
  * background goes inert, and Escape closes. Everything below is the part the
  * platform does not do.
  */
-export function NewScenario({ onCreated }: { onCreated: (id: string) => void }) {
+export function NewScenario({
+  onCreated,
+  onNewSession,
+}: {
+  onCreated: (id: string) => void
+  /** Archive this attempt and start clean. */
+  onNewSession: () => void
+}) {
   const t = useT()
   const dialog = useRef<HTMLDialogElement>(null)
   const topicField = useRef<HTMLTextAreaElement>(null)
@@ -78,6 +85,9 @@ export function NewScenario({ onCreated }: { onCreated: (id: string) => void }) 
         </button>
         <button className="linkbtn" onClick={() => void window.kaze.revealScenarios()}>
           {t.openScenarioFolder}
+        </button>
+        <button className="linkbtn" onClick={onNewSession}>
+          {t.newSession}
         </button>
       </div>
 

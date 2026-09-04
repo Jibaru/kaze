@@ -156,6 +156,13 @@ export interface ReviewOutcome {
   audio: string | null
 }
 
+/** What the app needs to pick an attempt back up after a restart. */
+export interface AttemptMeta {
+  /** The Claude Code conversation this attempt has been running in. */
+  sessionId?: string
+  createdAt?: string
+}
+
 /** Result of snapshotting a design as a numbered revision. */
 export interface RevisionResult {
   revision: number
@@ -189,6 +196,8 @@ export interface KazeApi {
   /** Snapshots the design, then runs one turn against it. */
   review(diagram: Diagram, intent: TurnIntent, question?: string): Promise<ReviewOutcome>
   cancelTurn(): Promise<void>
+  /** Archives the current attempt and starts an empty one. */
+  newSession(): Promise<{ archivedTo: string } | { cancelled: true }>
   /** Operations that answer one finding. The renderer validates and applies them. */
   proposeFix(claim: string, fix: string): Promise<import('./patch').PatchOp[]>
   hasVoiceKey(): Promise<boolean>

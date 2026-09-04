@@ -20,6 +20,7 @@ const api: KazeApi = {
   review: (diagram: Diagram, intent: TurnIntent, question?: string) =>
     ipcRenderer.invoke('review:run', diagram, intent, question),
   cancelTurn: () => ipcRenderer.invoke('review:cancel'),
+  newSession: () => ipcRenderer.invoke('attempt:new'),
   proposeFix: (claim: string, fix: string) => ipcRenderer.invoke('review:fix', claim, fix),
   hasVoiceKey: () => ipcRenderer.invoke('voice:has-key'),
   setVoiceKey: (key: string) => ipcRenderer.invoke('voice:set-key', key),

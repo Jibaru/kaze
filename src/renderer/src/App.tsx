@@ -299,6 +299,19 @@ function Canvas() {
     [diagram, setNodes, setEdges, markDirty, t],
   )
 
+  /** Archive the attempt and start clean: empty canvas, empty ledger, new turn. */
+  const newSession = useCallback(async () => {
+    const result = await window.kaze.newSession()
+    if ('cancelled' in result) return
+    setNodes([])
+    setEdges([])
+    setOutcome(null)
+    setTranscript('')
+    setBeforeFix(null)
+    setDirty(false)
+    setStatus(t.sessionArchived)
+  }, [setNodes, setEdges, t])
+
   const undoFix = useCallback(() => {
     if (!beforeFix) return
     const flow = toFlow(beforeFix)
@@ -471,6 +484,7 @@ function Canvas() {
             activeId={scenarioId}
             onSelect={setScenarioId}
             onCreated={(id) => void adoptScenario(id)}
+            onNewSession={() => void newSession()}
           />
         </div>
         <div className="rail__section">

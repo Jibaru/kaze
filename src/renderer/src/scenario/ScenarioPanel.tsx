@@ -12,12 +12,14 @@ export function ScenarioPanel({
   activeId,
   onSelect,
   onCreated,
+  onNewSession,
 }: {
   scenarios: Scenario[]
   activeId: string
   onSelect: (id: string) => void
   /** A scenario was just written; reload the bank and switch to it. */
   onCreated: (id: string) => void
+  onNewSession: () => void
 }) {
   const t = useT()
   const active = scenarios.find((s) => s.id === activeId)
@@ -26,7 +28,7 @@ export function ScenarioPanel({
     return (
       <div className="scenario">
         <p className="inspector__hint">{t.noScenarios}</p>
-        <NewScenario onCreated={onCreated} />
+        <NewScenario onCreated={onCreated} onNewSession={onNewSession} />
       </div>
     )
   }
@@ -45,7 +47,7 @@ export function ScenarioPanel({
           </option>
         ))}
       </select>
-      <NewScenario onCreated={onCreated} />
+      <NewScenario onCreated={onCreated} onNewSession={onNewSession} />
       {active && <Markdown className="scenario__brief">{active.brief}</Markdown>}
     </div>
   )

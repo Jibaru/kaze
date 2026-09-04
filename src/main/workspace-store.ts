@@ -1,8 +1,9 @@
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
+import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { diffDiagrams, toDesignDocument } from '../shared/adl'
 import type { Ledger } from '../shared/ledger'
-import type { Diagram, RevisionResult } from '../shared/types'
+import { existsSync } from 'node:fs'
+import type { AttemptMeta, Diagram, RevisionResult } from '../shared/types'
 
 /**
  * Owns the on-disk workspace. This is also the directory the Claude Code
@@ -49,6 +50,68 @@ export class WorkspaceStore {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
       throw err
     }
+  }
+
+  private metaPath(attemptId: string): string {
+    return join(this.attemptDir(attemptId), 'meta.json')
+  }
+
+  /**
+   * What the app needs to pick an attempt back up, chiefly the Claude session
+   * id. Without it every launch silently starts a fresh conversation while the
+   * reviewer still reads the accumulated ledger off disk — a new reviewer with
+   * an old case file, which is the worst of both.
+   */
+  async readMeta(attemptId = 'default'): Promise<AttemptMeta> {
+    try {
+      return JSON.parse(await readFile(this.metaPath(attemptId), 'utf-8')) as AttemptMeta
+    } catch {
+      return {}
+    }
+  }
+
+  async writeMeta(meta: AttemptMeta, attemptId = 'default'): Promise<void> {
+    await mkdir(this.attemptDir(attemptId), { recursive: true })
+    await writeFile(this.metaPath(attemptId), JSON.stringify(meta, null, 2), 'utf-8')
+  }
+
+  /**
+   * Put the current attempt aside and start an empty one.
+   *
+   * Moved rather than deleted: an attempt is a record of what you designed and
+   * what it was reviewed as, and a button that throws that away is a button
+   * people are right to distrust.
+   */
+  async archiveAttempt(attemptId = 'default'): Promise<string | null> {
+    const from = this.attemptDir(attemptId)
+    if (!existsSync(from)) return null
+
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+    const archive = join(this.root, 'attempts', 'archive')
+    await mkdir(archive, { recursive: true })
+
+    // The stamp is only accurate to the second, so two archives in a row can
+    // ask for the same name. Left alone, the copy-then-remove path would merge
+    // one attempt into the other and quietly mix two designs.
+    let to = join(archive, `${attemptId}-${stamp}`)
+    for (let n = 2; existsSync(to); n++) to = join(archive, `${attemptId}-${stamp}-${n}`)
+
+    try {
+      await rename(from, to)
+    } catch (err) {
+      // Renaming a directory on Windows fails with EPERM whenever anything
+      // still holds a handle inside it — an audio file the app just wrote, a
+      // virus scanner reading it. Copy-then-remove is slower and survives that,
+      // and the copy completes before anything is removed, so a failure here
+      // leaves the attempt where it was rather than half-moved.
+      const code = (err as NodeJS.ErrnoException).code
+      if (code !== 'EPERM' && code !== 'EBUSY' && code !== 'EXDEV') throw err
+      await cp(from, to, { recursive: true })
+      await rm(from, { recursive: true, force: true })
+    }
+
+    await mkdir(from, { recursive: true })
+    return to
   }
 
   ledgerPath(attemptId = 'default'): string {

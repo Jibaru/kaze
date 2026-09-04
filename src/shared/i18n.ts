@@ -49,6 +49,12 @@ export interface Dict {
   fixNothing: string
   undo: string
   undone: string
+  newSession: string
+  newSessionTitle: string
+  newSessionDetail: string
+  newSessionConfirm: string
+  newSessionCancel: string
+  sessionArchived: string
   imageCopied: (width: number, height: number) => string
   nothingToCopy: string
   copyFailed: (reason: string) => string
@@ -191,6 +197,13 @@ const es: Dict = {
   fixNothing: 'El modelo no propuso ningún cambio aplicable.',
   undo: 'Deshacer',
   undone: 'Cambio deshecho.',
+  newSession: 'Empezar de cero',
+  newSessionTitle: '¿Empezar una sesión nueva?',
+  newSessionDetail:
+    'Se archiva el intento actual —diagrama, hallazgos, revisiones y audio— y empiezas con el lienzo vacío y una conversación nueva. No se borra nada: queda en attempts/archive.',
+  newSessionConfirm: 'Archivar y empezar',
+  newSessionCancel: 'Cancelar',
+  sessionArchived: 'Intento archivado. Sesión nueva.',
   imageCopied: (w, h) => `Diagrama copiado al portapapeles · ${w}×${h}`,
   nothingToCopy: 'No hay nada que copiar todavía.',
   copyFailed: (reason) => `No se pudo copiar el diagrama: ${reason}`,
@@ -444,6 +457,13 @@ const en: Dict = {
   fixNothing: 'The model proposed nothing that could be applied.',
   undo: 'Undo',
   undone: 'Change undone.',
+  newSession: 'Start fresh',
+  newSessionTitle: 'Start a new session?',
+  newSessionDetail:
+    'The current attempt — diagram, findings, revisions and audio — is archived, and you start with an empty canvas and a new conversation. Nothing is deleted: it stays in attempts/archive.',
+  newSessionConfirm: 'Archive and start',
+  newSessionCancel: 'Cancel',
+  sessionArchived: 'Attempt archived. New session.',
   imageCopied: (w, h) => `Diagram copied to the clipboard · ${w}×${h}`,
   nothingToCopy: 'Nothing to copy yet.',
   copyFailed: (reason) => `Could not copy the diagram: ${reason}`,

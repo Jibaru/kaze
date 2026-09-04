@@ -92,6 +92,11 @@ export class SessionManager {
     this.sessionId = null
   }
 
+  /** Continue a conversation from a previous run of the app. */
+  adopt(sessionId: string | undefined): void {
+    if (sessionId) this.sessionId = sessionId
+  }
+
   private options(): Options {
     const denied: string[] = []
     const base: Options = {

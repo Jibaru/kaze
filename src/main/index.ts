@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, ipcMain, Menu, shell } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, shell } from 'electron'
 import { cp, mkdir, writeFile } from 'node:fs/promises'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -26,7 +26,16 @@ const templateRoot = app.isPackaged
 let win: BrowserWindow | null = null
 const emit = (event: ReviewEvent) => win?.webContents.send('review:event', event)
 
-const session = new SessionManager({ cwd: store.attemptDir(ATTEMPT), emit })
+const session = new SessionManager({
+  cwd: store.attemptDir(ATTEMPT),
+  emit: (event) => {
+    // The conversation id is worth keeping: without it a restart quietly opens
+    // a new conversation while the reviewer still reads the accumulated ledger
+    // off disk.
+    if (event.kind === 'session') void store.writeMeta({ sessionId: event.sessionId }, ATTEMPT)
+    emit(event)
+  },
+})
 const voice = new VoiceService(join(app.getPath('userData'), 'openai.key'))
 
 /**
@@ -187,6 +196,29 @@ ipcMain.handle('locale:set', async (_e, locale: Locale) => {
 ipcMain.handle('review:cancel', () => session.cancel())
 
 /**
+ * Put the attempt aside and start clean: a fresh conversation, an empty
+ * diagram, an empty ledger. The old attempt is moved rather than deleted, so
+ * what you designed and how it was reviewed stays on disk.
+ */
+ipcMain.handle('attempt:new', async () => {
+  const t = dict(currentLocale())
+  const { response } = await dialog.showMessageBox(win!, {
+    type: 'question',
+    buttons: [t.newSessionConfirm, t.newSessionCancel],
+    defaultId: 0,
+    cancelId: 1,
+    message: t.newSessionTitle,
+    detail: t.newSessionDetail,
+  })
+  if (response !== 0) return { cancelled: true as const }
+
+  session.reset()
+  const archivedTo = await store.archiveAttempt(ATTEMPT)
+  await store.writeMeta({ createdAt: new Date().toISOString() }, ATTEMPT)
+  return { archivedTo: archivedTo ?? '' }
+})
+
+/**
  * Ask for the change one finding calls for, as operations rather than as a new
  * design. The model proposes; the renderer validates and applies. Letting it
  * hand back a whole diagram would make every fix an unreviewable rewrite, and
@@ -310,6 +342,9 @@ const reviewPrompt = (scenarioId: string, revision: number, locale: Locale) =>
 ${REPLY_LANGUAGE[locale]}`
 
 void app.whenReady().then(async () => {
+  // Continue where the last run left off rather than starting a conversation
+  // that has never seen the design it is about to be asked to review.
+  session.adopt((await store.readMeta(ATTEMPT)).sessionId)
   // No stock File/Edit/View menu: this is a canvas, not a document editor.
   Menu.setApplicationMenu(null)
   await scaffoldWorkspace()
