@@ -178,7 +178,10 @@ ${REPLY_LANGUAGE[locale]}`,
       )
       return {
         intent,
-        markdown: answer.trim(),
+        // The skill has been used all session, so the model often appends a
+        // findings block out of habit even when only asked a question. Strip
+        // it: it is machinery, and a question never touches the ledger.
+        markdown: parseReview(answer).markdown,
         payload: null,
         problem: null,
         revision: null,

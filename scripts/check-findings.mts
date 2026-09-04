@@ -53,6 +53,16 @@ const trailing = parseReview(`Review text.\n\n${good}\n\nLet me know if you want
 check('survives text after the block', trailing.payload !== null)
 check('removes the block but keeps the trailing sentence', trailing.markdown.includes('go deeper'))
 
+// Observed live: a payload fenced with an info string other than lowercase
+// `json` was left in the transcript verbatim, because a fence is whatever the
+// model felt like typing after the backticks.
+for (const tag of ['JSON', 'json5', 'jsonc', 'json ']) {
+  const payload = JSON.stringify({ verdict: 'solid', findings: [] })
+  const tagged = parseReview('Review.' + '\n\n' + '```' + tag + '\n' + payload + '\n```')
+  check('strips a payload fenced as ' + tag.trim(), tagged.payload !== null && !tagged.markdown.includes('verdict'),
+    tagged.markdown)
+}
+
 // A fenced block with no language tag is still worth trying.
 const untagged = parseReview('Review.\n\n```\n' + JSON.stringify({ verdict: 'solid', findings: [] }) + '\n```')
 check('accepts an untagged fenced block', untagged.payload !== null)
@@ -74,6 +84,40 @@ check('defaults a missing bp_id to null', sloppy.payload?.findings[0]?.bp_id ===
 // A finding with no claim carries no information; drop it rather than render a blank row.
 const empty = parseReview(block(JSON.stringify({ verdict: 'solid', findings: [{ id: 'f-y' }] })))
 check('drops a finding with no claim', empty.payload?.findings.length === 0)
+
+// Observed live: the closing fence never arrives, or there is no fence at all,
+// and a wall of raw JSON ends up in the transcript. Neither can be matched by
+// looking for a pair of fences.
+const unterminated = parseReview('Review text.' + '\n\n' + '```json' + '\n' + JSON.stringify({ verdict: 'needs_work', spoken_summary: 'x', findings: [{ id: 'f-a', claim: 'The DB is single-AZ.' }], resolved: [] }))
+check('strips a payload whose closing fence never arrived', unterminated.payload !== null &&
+  !unterminated.markdown.includes('spoken_summary'), unterminated.markdown)
+check('keeps the prose when the fence is unterminated', unterminated.markdown.startsWith('Review text.'))
+
+const unfenced = parseReview('Review text.' + '\n\n' + JSON.stringify({ verdict: 'needs_work', spoken_summary: 'x', findings: [{ id: 'f-a', claim: 'The DB is single-AZ.' }], resolved: [] }))
+check('strips a payload emitted with no fence at all', unfenced.payload !== null &&
+  !unfenced.markdown.includes('spoken_summary'), unfenced.markdown)
+
+// Observed in the running app, and the shape that survived two earlier fixes:
+// the payload as a four-space indented code block rather than a fenced one.
+const PAYLOAD = JSON.stringify(
+  { verdict: 'needs_work', spoken_summary: 'x', findings: [{ id: 'f-a', claim: 'Single-AZ.' }], resolved: [] },
+  null,
+  2,
+)
+const indented = parseReview(
+  'Review text.\n\n' + PAYLOAD.split('\n').map((l) => '    ' + l).join('\n'),
+)
+check(
+  'strips a payload indented as a code block rather than fenced',
+  indented.payload !== null && !indented.markdown.includes('spoken_summary'),
+  indented.markdown,
+)
+check('keeps the prose when the payload was indented', indented.markdown === 'Review text.')
+
+// The fallback must not eat legitimate JSON the review is talking about.
+const quoted = parseReview('Use this policy:' + '\n\n' + '```json' + '\n' + '{ "Effect": "Allow" }' + '\n```')
+check('leaves a non-payload JSON block alone', quoted.payload === null && quoted.markdown.includes('Effect'))
+
 
 // Degrade, never throw.
 const noBlock = parseReview('I reviewed it and it looks fine to me.')

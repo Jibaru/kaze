@@ -264,6 +264,10 @@ function Canvas() {
       try {
         const result = await window.kaze.review(diagram, intent, text)
         setOutcome(result)
+        // The live stream includes the fenced findings block, which is machinery
+        // rather than review. Once the turn lands, show the parsed prose with it
+        // stripped out.
+        if (result.markdown) setTranscript(result.markdown)
         setDirty(false)
         // The result is spoken as well as written: you asked for it by voice,
         // you get it back by voice, and the transcript is there to read.

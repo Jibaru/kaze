@@ -138,6 +138,10 @@ export class SessionManager {
       for await (const message of query({ prompt, options: { ...this.options(), abortController: abort } })) {
         if (abort.signal.aborted) break
         this.consume(message, (chunk) => {
+          // Separate blocks are separate paragraphs. Concatenated flush, a
+          // block that opens with a heading lands mid-line — "…the ledger.##
+          // Revisión" — and markdown never sees a heading at all.
+          if (text && !text.endsWith('\n\n')) text += '\n\n'
           text += chunk
         })
       }

@@ -3,6 +3,7 @@ import { openEntries, resolvedEntries, sortEntries, type Ledger, type LedgerEntr
 import type { ReviewProblem } from '@shared/findings'
 import type { Dict } from '@shared/i18n'
 import { useT } from '../i18n/useLocale'
+import { Markdown } from '../markdown/Markdown'
 
 const verdictLabel = (t: Dict, verdict: string): string =>
   ({ solid: t.verdictSolid, needs_work: t.verdictNeedsWork, does_not_meet_brief: t.verdictDoesNotMeet })[
@@ -86,7 +87,8 @@ export function ReviewPanel({
         {showTranscript ? '▾' : '▸'} {t.transcript}{' '}
         {streaming && <span className="pulse" aria-label={t.reviewing} />}
       </button>
-      {(showTranscript || streaming) && <div className="transcript">{transcript || '…'}</div>}
+      {(showTranscript || streaming) &&
+        (transcript ? <Markdown className="transcript">{transcript}</Markdown> : <p className="transcript">…</p>)}
     </div>
   )
 }

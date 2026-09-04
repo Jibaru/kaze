@@ -40,7 +40,45 @@ export interface ParsedReview {
   problem: ReviewProblem | null
 }
 
-const FENCED = /```(?:json)?\s*\n([\s\S]*?)\n?```/g
+/**
+ * Any info string, not just `json`. A fence is whatever the model felt like
+ * typing after the backticks, and a payload tagged `JSON` or `json5` was left
+ * in the transcript verbatim while this only accepted lowercase `json`.
+ */
+const FENCED = /```[^\n`]*\n([\s\S]*?)\n?```/g
+
+/**
+ * The last `{...}` that starts a line and parses, scanned from the end.
+ *
+ * This exists because a fenced block is not the only shape a payload arrives
+ * in: the closing fence sometimes never comes, and sometimes there is no fence
+ * at all. Neither can be matched by looking for a pair of fences, and both put
+ * a wall of raw JSON in front of the user. Cheap, because it only runs once the
+ * fenced path has already failed.
+ */
+function lastJsonObject(text: string): { value: unknown; start: number } | null {
+  for (let i = text.length - 1; i >= 0; i--) {
+    if (text[i] !== '{') continue
+    // Only whitespace may precede it on its line. Requiring the newline
+    // immediately before missed an indented code block, which is how the model
+    // emits the payload when it does not fence it — the one shape that put a
+    // wall of JSON in front of the user in the running app.
+    const lineStart = text.lastIndexOf('\n', i - 1) + 1
+    if (text.slice(lineStart, i).trim() !== '') continue
+    const tail = text
+      .slice(i)
+      .replace(/(?:```|~~~)[^`~]*$/, '')
+      .trim()
+    const end = tail.lastIndexOf('}')
+    if (end === -1) continue
+    try {
+      return { value: JSON.parse(tail.slice(0, end + 1)), start: i }
+    } catch {
+      // Not the start of a complete object; keep scanning backwards.
+    }
+  }
+  return null
+}
 
 const SEVERITIES: Severity[] = ['high', 'medium', 'low']
 const VERDICTS: Verdict[] = ['solid', 'needs_work', 'does_not_meet_brief']
@@ -101,6 +139,20 @@ export function parseReview(text: string): ParsedReview {
     if (!payload) continue
     const markdown = (text.slice(0, block.start) + text.slice(block.end)).trim()
     return { markdown, payload, problem: null }
+  }
+
+  // Fenced parsing is done. Anything left is a payload the fences did not
+  // contain — an unterminated block, or one emitted with no fence at all.
+  const bare = lastJsonObject(text)
+  if (bare) {
+    const payload = coercePayload(bare.value)
+    if (payload) {
+      const markdown = text
+        .slice(0, bare.start)
+        .replace(/(?:```|~~~)[^\n`~]*\s*$/, '')
+        .trim()
+      return { markdown, payload, problem: null }
+    }
   }
 
   const sawJson = blocks.length > 0

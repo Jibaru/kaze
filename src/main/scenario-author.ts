@@ -87,7 +87,7 @@ export interface AuthoredScenario {
   markdown: string
 }
 
-const FENCED = /```(?:markdown|md)?\s*\n([\s\S]*?)\n?```/g
+const FENCED = /```[^\n`]*\n([\s\S]*?)\n?```/g
 
 /**
  * Pull the file out of the reply and refuse anything that would not work as a
