@@ -15,6 +15,18 @@ The design is `kaze-adl`: a YAML block listing `groups` (boundaries), `nodes`
 (services with configured props), `edges` (connections with protocols), and
 `gaps` (omissions the app detected mechanically).
 
+Two node types are not AWS services:
+
+- `service: Actor` is the person or system on the other end — a user, a partner,
+  a cron somewhere else. It belongs outside every boundary. Its `scale` prop, if
+  set, is the load the design has to carry, and is worth arguing with when it
+  does not match the scenario.
+- `service: Custom` is something the practitioner named themselves, because the
+  palette had no entry for it. Read its `kind` and `label`, judge it on what
+  they say it is, and do not assume an AWS service. If `kind` is vague, that
+  vagueness is itself worth a finding: an unnamed component cannot be reasoned
+  about.
+
 `gaps` are already-known facts, computed by the app — not your findings. Do not
 spend a finding restating one unless it matters enough to argue for. Your value
 is the judgement the app cannot compute: whether the *shape* of the design meets

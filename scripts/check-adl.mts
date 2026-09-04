@@ -23,6 +23,7 @@ const flawed: Diagram = {
     { id: 'subnet', kind: 'subnet', label: 'unused', x: 0, y: 0, width: 200, height: 140, parentId: 'vpc' },
   ],
   nodes: [
+    { id: 'a1', serviceId: 'Actor', label: 'lectores', props: { channel: 'web' }, x: 0, y: 0, parentId: 'vpc' },
     { id: 'n0', serviceId: 'Route53', label: 'dns', props: { routing_policy: 'latency' }, x: 0, y: 0 },
     { id: 'n1', serviceId: 'CloudFront', label: 'cdn', props: {}, x: 0, y: 0 },
     { id: 'n2', serviceId: 'ALB', label: 'edge-lb', props: {}, x: 0, y: 0, parentId: 'vpc' },
@@ -32,6 +33,7 @@ const flawed: Diagram = {
     { id: 'n6', serviceId: 'S3', label: 'raw-clicks', props: {}, x: 0, y: 0 },
   ],
   edges: [
+    { id: 'ea', from: 'a1', to: 'n0', protocol: 'HTTPS' },
     { id: 'e0', from: 'n0', to: 'n1', protocol: 'DNS' },
     { id: 'e1', from: 'n1', to: 'n2', protocol: 'HTTPS' },
     { id: 'e2', from: 'n2', to: 'n3' },
@@ -52,6 +54,8 @@ check('internet-facing node with no TLS is flagged', has('untls_entrypoint', 'n2
 check('stateful node outside every boundary is flagged', has('unplaced', 'n6'))
 check('empty boundary is flagged', has('empty_boundary', 'subnet'))
 check('a design with no monitoring is flagged', has('no_observability'))
+// An actor drawn inside a VPC says the user runs in your network.
+check('an actor inside a boundary is flagged', has('actor_inside_boundary', 'a1'))
 
 // Route 53 is an entry point, but TLS is not a question you can answer about
 // it. A rule that fires where the design cannot respond is noise.
@@ -74,20 +78,28 @@ for (const spec of SERVICES) {
 check('every gap the manifest demands is closable from the inspector', unclosable.length === 0, unclosable.join(', '))
 
 // ── now fix everything, and check the gaps actually go away ────────────────
+// Patches are keyed by id rather than by array index: a fixture that depends on
+// position breaks the moment a node is added at the front, and the failure looks
+// like a rule regression rather than a test that moved.
+const FIXES: Record<string, Partial<Diagram['nodes'][number]>> = {
+  a1: { parentId: undefined },
+  n1: { props: { tls: true } },
+  n2: { props: { tls: true } },
+  n3: { props: { multi_az: true, autoscaling: 'target 60% CPU, 2-20' } },
+  n4: { props: { engine: 'postgres', multi_az: true, backup: 'PITR, 7 days' } },
+  n5: { props: { engine: 'redis', multi_az: true } },
+  n6: { props: { versioning: true }, parentId: 'vpc' },
+}
+
 const fixed: Diagram = {
   ...flawed,
   groups: flawed.groups.filter((g) => g.id !== 'subnet'),
   nodes: [
-    flawed.nodes[0]!,
-    { ...flawed.nodes[1]!, props: { tls: true } },
-    { ...flawed.nodes[2]!, props: { tls: true } },
-    { ...flawed.nodes[3]!, props: { multi_az: true, autoscaling: 'target 60% CPU, 2-20' } },
-    { ...flawed.nodes[4]!, props: { engine: 'postgres', multi_az: true, backup: 'PITR, 7 days' } },
-    { ...flawed.nodes[5]!, props: { engine: 'redis', multi_az: true } },
-    { ...flawed.nodes[6]!, props: { versioning: true }, parentId: 'vpc' },
+    ...flawed.nodes.map((n) => ({ ...n, ...(FIXES[n.id] ?? {}) })),
     { id: 'n7', serviceId: 'CloudWatch', label: 'alarms', props: { alarms: 'p99 > 200ms for 5m' }, x: 0, y: 0 },
   ],
   edges: [
+    { id: 'ea', from: 'a1', to: 'n0', protocol: 'HTTPS' },
     { id: 'e0', from: 'n0', to: 'n1', protocol: 'DNS' },
     { id: 'e1', from: 'n1', to: 'n2', protocol: 'HTTPS' },
     { id: 'e2', from: 'n2', to: 'n3', protocol: 'HTTP' },
@@ -107,6 +119,13 @@ check('S3 versioning counts as a backup story', !fixedGaps.some((g) => g.rule ==
 check('typing the edge clears the finding', !fixedGaps.some((g) => g.rule === 'untyped_edge'))
 check('connecting the cache clears the finding', !fixedGaps.some((g) => g.rule === 'unconnected_node'))
 check('adding CloudWatch clears the observability finding', !fixedGaps.some((g) => g.rule === 'no_observability'))
+check('moving the actor out of the VPC clears the finding',
+  !fixedGaps.some((g) => g.rule === 'actor_inside_boundary'))
+// Custom nodes carry no flags, so no rule may invent a requirement for them.
+check('a Custom node raises nothing beyond being unconnected',
+  computeGaps({ ...fixed, nodes: [...fixed.nodes, { id: 'c1', serviceId: 'Custom', label: 'Kafka', props: { kind: 'Kafka' }, x: 0, y: 0 }] })
+    .filter((g) => g.refs.includes('c1'))
+    .every((g) => g.rule === 'unconnected_node'))
 check('a corrected design has no gaps at all', fixedGaps.length === 0, rules || 'none')
 
 // ── diff ──────────────────────────────────────────────────────────────────
@@ -114,7 +133,9 @@ const diff = diffDiagrams(flawed, fixed)
 check('diff sees the added node', diff.addedNodes.some((n) => n.startsWith('n7 ')))
 check('diff sees the added edges', diff.addedEdges.includes('n3 -> n5'))
 check('diff sees a flipped prop', diff.changedProps.includes('n4.multi_az: unset -> true'))
-check('diff ignores what did not move', !diff.changedProps.some((c) => c.startsWith('n1.tls') === false && c.startsWith('n4.engine')))
+// A prop that was already set and did not change must not appear as a change.
+check('diff ignores what did not move', !diff.changedProps.some((c) => c.startsWith('n4.engine')),
+  diff.changedProps.filter((c) => c.startsWith('n4.engine')).join(', '))
 
 // ── serialization ─────────────────────────────────────────────────────────
 const text = serialize(flawed, { revision: 1, diff: diffDiagrams(null, flawed) })

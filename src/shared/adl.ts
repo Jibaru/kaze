@@ -136,6 +136,17 @@ export function computeGaps(diagram: Diagram): Gap[] {
       })
     }
 
+    // An actor is not part of the system; drawing one inside a VPC says the
+    // user runs in your network, which is never what was meant.
+    if (flags.external && parentOf(diagram, node.id)) {
+      gaps.push({
+        rule: 'actor_inside_boundary',
+        subject: describe(node),
+        extra: parentOf(diagram, node.id),
+        refs: [node.id],
+      })
+    }
+
     if (flags.entryPoint && models(node.serviceId, ['tls']) && node.props.tls !== true) {
       gaps.push({
         rule: 'untls_entrypoint',

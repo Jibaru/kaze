@@ -13,6 +13,7 @@ export type PropSpec =
   | { key: string; kind: 'enum'; options: string[] }
 
 export type Category =
+  | 'Actors'
   | 'Compute'
   | 'Containers'
   | 'Storage'
@@ -23,6 +24,7 @@ export type Category =
   | 'Analytics'
   | 'Security'
   | 'Observability'
+  | 'Other'
 
 /**
  * Review-relevant metadata driving the `gaps:` section of the serialized
@@ -40,6 +42,11 @@ export interface ServiceFlags {
   entryPoint?: boolean
   /** Scales by configuration rather than automatically. */
   needsScalingPolicy?: boolean
+  /**
+   * Lives outside the system being designed — a person, another company's
+   * service. Drawing one inside a VPC is a modelling mistake, not a choice.
+   */
+  external?: boolean
 }
 
 export type GroupKind = 'account' | 'region' | 'vpc' | 'az' | 'subnet'

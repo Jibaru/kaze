@@ -33,8 +33,12 @@ import {
   AwsWaf,
   ElasticLoadBalancing,
 } from '@aws-icons/react/architecture-service'
+// Neither of these is a service, so they come from the resource set.
+import { GenericApplication, User } from '@aws-icons/react/resource'
 
 export const SERVICE_ICONS: Record<string, AwsIconComponent> = {
+  Actor: User,
+  Custom: GenericApplication,
   Route53: AmazonRoute53,
   CloudFront: AmazonCloudFront,
   WAF: AwsWaf,

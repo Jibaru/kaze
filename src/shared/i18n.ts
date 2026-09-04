@@ -255,6 +255,7 @@ const es: Dict = {
 
   gapRule: {
     unconnected_node: 'nodo sin conexiones',
+    actor_inside_boundary: 'actor dentro de un límite',
     unplaced: 'sin ubicar',
     single_az: 'una sola zona',
     no_backup: 'sin respaldo',
@@ -269,6 +270,8 @@ const es: Dict = {
     switch (rule) {
       case 'unconnected_node':
         return `${subject} no tiene conexiones de entrada ni de salida`
+      case 'actor_inside_boundary':
+        return `${subject} está dibujado dentro de ${extra}, pero un actor está fuera del sistema, no dentro de tu red`
       case 'unplaced':
         return `${subject} está fuera de todo límite, así que su ubicación y su radio de impacto quedan sin declarar`
       case 'single_az':
@@ -293,6 +296,7 @@ const es: Dict = {
   },
 
   category: {
+    Actors: 'Actores',
     Compute: 'Cómputo',
     Containers: 'Contenedores',
     Storage: 'Almacenamiento',
@@ -303,8 +307,13 @@ const es: Dict = {
     Analytics: 'Analítica',
     Security: 'Seguridad',
     Observability: 'Observabilidad',
+    Other: 'Otros',
   },
   prop: {
+    channel: 'Canal',
+    scale: 'Volumen',
+    kind: '¿Qué es?',
+    notes: 'Notas',
     multi_az: 'Multi-AZ',
     backup: 'Respaldo / retención',
     instance_class: 'Clase de instancia',
@@ -338,6 +347,9 @@ const es: Dict = {
     alarms: 'Alarmas',
   },
   propPlaceholder: {
+    scale: 'p. ej. 100 M de redirecciones al día, pico 10x',
+    kind: 'p. ej. Kafka, un CDN de terceros, un ERP existente',
+    notes: 'p. ej. lo mantiene otro equipo, SLA de 99,9 %',
     backup: 'p. ej. PITR, 7 días',
     instance_class: 'p. ej. db.r6g.large',
     read_replicas: 'p. ej. 2',
@@ -467,6 +479,7 @@ const en: Dict = {
 
   gapRule: {
     unconnected_node: 'unconnected node',
+    actor_inside_boundary: 'actor inside a boundary',
     unplaced: 'unplaced',
     single_az: 'single AZ',
     no_backup: 'no backup',
@@ -481,6 +494,8 @@ const en: Dict = {
     switch (rule) {
       case 'unconnected_node':
         return `${subject} has no inbound or outbound edges`
+      case 'actor_inside_boundary':
+        return `${subject} is drawn inside ${extra}, but an actor sits outside the system rather than in your network`
       case 'unplaced':
         return `${subject} sits outside every boundary, so its placement and blast radius are unstated`
       case 'single_az':
@@ -505,6 +520,7 @@ const en: Dict = {
   },
 
   category: {
+    Actors: 'Actors',
     Compute: 'Compute',
     Containers: 'Containers',
     Storage: 'Storage',
@@ -515,8 +531,13 @@ const en: Dict = {
     Analytics: 'Analytics',
     Security: 'Security',
     Observability: 'Observability',
+    Other: 'Other',
   },
   prop: {
+    channel: 'Channel',
+    scale: 'Volume',
+    kind: 'What is it?',
+    notes: 'Notes',
     multi_az: 'Multi-AZ',
     backup: 'Backup / retention',
     instance_class: 'Instance class',
@@ -550,6 +571,9 @@ const en: Dict = {
     alarms: 'Alarms',
   },
   propPlaceholder: {
+    scale: 'e.g. 100M redirects/day, 10x peak',
+    kind: 'e.g. Kafka, a third-party CDN, an existing ERP',
+    notes: 'e.g. owned by another team, 99.9% SLA',
     backup: 'e.g. PITR, 7 days',
     instance_class: 'e.g. db.r6g.large',
     read_replicas: 'e.g. 2',

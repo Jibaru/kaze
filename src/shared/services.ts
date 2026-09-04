@@ -34,6 +34,21 @@ const AUTOSCALE: PropSpec = { key: 'autoscaling', kind: 'text' }
 const TLS: PropSpec = { key: 'tls', kind: 'bool' }
 
 export const SERVICES: ServiceSpec[] = [
+  // ── Actors ──────────────────────────────────────────────────────────────
+  {
+    // Not an AWS service: the person or system on the other end. Naming who
+    // arrives, and at what rate, is what makes an entry path arguable.
+    id: 'Actor',
+    name: 'Actor',
+    category: 'Actors',
+    aliases: ['user', 'client', 'usuario', 'cliente', 'persona', 'actor', 'trafico', 'tráfico'],
+    flags: { external: true },
+    reviewProps: [
+      { key: 'channel', kind: 'enum', options: ['web', 'mobile', 'api', 'iot', 'batch'] },
+      { key: 'scale', kind: 'text' },
+    ],
+  },
+
   // ── Edge ────────────────────────────────────────────────────────────────
   {
     id: 'Route53',
@@ -279,6 +294,21 @@ export const SERVICES: ServiceSpec[] = [
     aliases: ['metrics', 'logs', 'alarms', 'monitoring', 'métricas', 'registros', 'alarmas', 'monitoreo'],
     reviewProps: [{ key: 'alarms', kind: 'text' }],
   },
+
+  // ── Anything the manifest does not know ────────────────────────────────
+  {
+    // The escape hatch. A design is not wrong for containing something this
+    // app has never heard of, and being unable to draw it is worse than
+    // drawing it loosely: `kind` is what the reviewer reads.
+    id: 'Custom',
+    name: 'Custom',
+    category: 'Other',
+    aliases: ['custom', 'other', 'otro', 'personalizado', 'generico', 'genérico', 'tercero', 'kafka'],
+    reviewProps: [
+      { key: 'kind', kind: 'text' },
+      { key: 'notes', kind: 'text' },
+    ],
+  },
 ]
 
 const BY_ID = new Map(SERVICES.map((s) => [s.id, s]))
@@ -286,6 +316,9 @@ const BY_ID = new Map(SERVICES.map((s) => [s.id, s]))
 export const getService = (id: string): ServiceSpec | undefined => BY_ID.get(id)
 
 export const CATEGORIES: Category[] = [
+  // Actors first: a diagram starts with who arrives. Custom last: it is the
+  // escape hatch, not a place to look before the real service.
+  'Actors',
   'Edge',
   'Networking',
   'Compute',
@@ -296,6 +329,7 @@ export const CATEGORIES: Category[] = [
   'Analytics',
   'Security',
   'Observability',
+  'Other',
 ]
 
 /**
