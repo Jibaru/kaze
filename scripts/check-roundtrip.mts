@@ -29,7 +29,7 @@ const nodes: KazeNode[] = [
 ]
 
 const edges: KazeEdge[] = [
-  { id: 'e-n1-n2', source: 'n1', target: 'n2', data: { protocol: 'DNS' } },
+  { id: 'e-n1-n2', source: 'n1', target: 'n2', data: { protocol: 'DNS' }, sourceHandle: 'bottom', targetHandle: 'top' },
   { id: 'e-n2-n3', source: 'n2', target: 'n3', data: { protocol: 'HTTPS' } },
   { id: 'e-n3-n4', source: 'n3', target: 'n4', data: {} },
   { id: 'e-n4-n5', source: 'n4', target: 'n5', data: { protocol: 'TCP/5432' } },
@@ -54,6 +54,14 @@ check('nested boundaries are preserved', saved.groups.find((g) => g.id === 'az-a
 check('group size is preserved', saved.groups.find((g) => g.id === 'vpc')?.width === 900)
 check('props are preserved', saved.nodes.find((n) => n.id === 'n9')?.props.partition_key === 'short_code')
 check('protocols are preserved', saved.edges.find((e) => e.id === 'e-n4-n5')?.protocol === 'TCP/5432')
+// Which side a line leaves and arrives on is presentation, kept so the drawing
+// survives a reload.
+const handled = saved.edges.find((e) => e.id === 'e-n1-n2')
+check('the sides a connection attaches to are preserved',
+  handled?.fromHandle === 'bottom' && handled?.toHandle === 'top',
+  `${handled?.fromHandle} -> ${handled?.toHandle}`)
+check('an edge with no chosen sides stays that way',
+  saved.edges.find((e) => e.id === 'e-n3-n4')?.fromHandle === undefined)
 check('an untyped edge stays untyped', saved.edges.find((e) => e.id === 'e-n3-n4')?.protocol === undefined)
 
 // The actual round trip: reload what we saved, save it again, compare.

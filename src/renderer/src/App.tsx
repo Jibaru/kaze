@@ -3,6 +3,7 @@ import {
   addEdge,
   Background,
   BackgroundVariant,
+  ConnectionMode,
   Controls,
   MiniMap,
   ReactFlow,
@@ -128,7 +129,11 @@ function Canvas() {
 
   const onConnect = useCallback(
     (c: Connection) => {
-      setEdges((eds) => addEdge({ ...c, id: `e-${c.source}-${c.target}` }, eds))
+      // The handles are part of the id: two lines between the same pair of
+      // nodes are legitimate now that there are four sides to attach to.
+      setEdges((eds) =>
+        addEdge({ ...c, id: `e-${c.source}${c.sourceHandle ?? ''}-${c.target}${c.targetHandle ?? ''}` }, eds),
+      )
       markDirty()
     },
     [setEdges, markDirty],
@@ -417,6 +422,9 @@ function Canvas() {
           }}
           onConnect={onConnect}
           nodeTypes={nodeTypes}
+          // Any handle can start or receive a connection, which is what lets
+          // one handle per side stand in for a source and a target both.
+          connectionMode={ConnectionMode.Loose}
           onDragOver={(e) => {
             e.preventDefault()
             e.dataTransfer.dropEffect = 'move'

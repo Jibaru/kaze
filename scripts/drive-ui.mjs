@@ -8,6 +8,7 @@
  * Usage: launch with --remote-debugging-port=9222, then
  *   node scripts/drive-ui.mjs '<javascript expression>'
  *   node scripts/drive-ui.mjs --key Escape
+ *   node scripts/drive-ui.mjs --drag <x1> <y1> <x2> <y2>
  *
  * `--key` sends a *trusted* key event through CDP. Synthetic KeyboardEvents
  * dispatched from page script cannot trigger user-agent behaviour — Escape
@@ -17,10 +18,12 @@
  */
 const PORT = process.env.KAZE_CDP_PORT ?? '9222'
 const keyMode = process.argv[2] === '--key'
-const expression = keyMode ? null : process.argv[2]
+const dragMode = process.argv[2] === '--drag'
+const expression = keyMode || dragMode ? null : process.argv[2]
 const key = keyMode ? process.argv[3] : null
-if (!expression && !key) {
-  console.error('usage: node scripts/drive-ui.mjs "<expression>" | --key <Key>')
+const drag = dragMode ? process.argv.slice(3, 7).map(Number) : null
+if (!expression && !key && !drag) {
+  console.error('usage: node scripts/drive-ui.mjs "<expression>" | --key <Key> | --drag x1 y1 x2 y2')
   process.exit(2)
 }
 
@@ -52,8 +55,29 @@ const send = (id, method, params) =>
   })
 
 let result
-if (keyMode) {
-  const params = { key, code: key, windowsVirtualKeyCode: key === 'Escape' ? 27 : 0 }
+if (dragMode) {
+  // Trusted mouse events. A drag built from synthetic MouseEvents does not
+  // drive a real drag-and-drop; this does, and it still cannot leave the page.
+  const [x1, y1, x2, y2] = drag
+  const base = { button: 'left', buttons: 1, clickCount: 1 }
+  await send(1, 'Input.dispatchMouseEvent', { type: 'mouseMoved', x: x1, y: y1, buttons: 0 })
+  await send(2, 'Input.dispatchMouseEvent', { type: 'mousePressed', x: x1, y: y1, ...base })
+  // Several steps: a single jump can be read as a click rather than a drag.
+  for (let i = 1; i <= 8; i++) {
+    await send(2 + i, 'Input.dispatchMouseEvent', {
+      type: 'mouseMoved',
+      x: x1 + ((x2 - x1) * i) / 8,
+      y: y1 + ((y2 - y1) * i) / 8,
+      buttons: 1,
+    })
+  }
+  await send(20, 'Input.dispatchMouseEvent', { type: 'mouseReleased', x: x2, y: y2, ...base })
+  result = { result: { value: `dragged ${x1},${y1} -> ${x2},${y2}` } }
+} else if (keyMode) {
+  // A trusted key event still needs the native key code, or the page sees a
+  // keypress the browser itself does not act on.
+  const CODES = { Escape: 27, Backspace: 8, Delete: 46, Enter: 13, Tab: 9 }
+  const params = { key, code: key, windowsVirtualKeyCode: CODES[key] ?? 0, nativeVirtualKeyCode: CODES[key] ?? 0 }
   await send(1, 'Input.dispatchKeyEvent', { type: 'keyDown', ...params })
   await send(2, 'Input.dispatchKeyEvent', { type: 'keyUp', ...params })
   result = { result: { value: `sent ${key}` } }

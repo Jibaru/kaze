@@ -149,9 +149,16 @@ check('a clean design says so explicitly', serialize(fixed).includes('gaps: []')
 // Presentation must not leak into the document the reviewer reads: whether a
 // connection is drawn curved or square-cornered is not something to have an
 // opinion about, and putting it in the design would invite one.
-const styled = serialize({ ...flawed, edgeStyle: 'smoothstep', background: 'grid' })
+const styled = serialize({
+  ...flawed,
+  edgeStyle: 'smoothstep',
+  background: 'grid',
+  edges: flawed.edges.map((e) => ({ ...e, fromHandle: 'bottom', toHandle: 'top' })),
+})
 check('the serialized design carries no view settings',
   !styled.includes('edgeStyle') && !styled.includes('smoothstep') && !styled.includes('background'))
+check('the serialized design carries no handle sides',
+  !styled.includes('fromHandle') && !styled.includes('bottom'))
 
 if (process.argv.includes('--print')) {
   console.log('\n--- serialize(flawed) ---\n')

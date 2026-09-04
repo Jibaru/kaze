@@ -18,7 +18,12 @@ export function ServiceNode({ id, data, selected }: NodeProps & { data: ServiceN
 
   return (
     <div className={`node ${selected ? 'node--selected' : ''}`}>
-      <Handle type="target" position={Position.Left} />
+      {/* One handle per side, all declared as sources: the canvas runs in
+          loose connection mode, where any handle can start or receive a
+          connection. Two overlapping handles per side would be the
+          alternative, and they fight each other for the pointer. */}
+      <Handle type="source" id="top" position={Position.Top} />
+      <Handle type="source" id="left" position={Position.Left} />
       <div className="node__head">
         {Icon ? <Icon className="node__icon" aria-hidden /> : <div className="node__icon node__icon--missing" />}
         <div className="node__titles">
@@ -37,7 +42,8 @@ export function ServiceNode({ id, data, selected }: NodeProps & { data: ServiceN
           ))}
         </div>
       )}
-      <Handle type="source" position={Position.Right} />
+      <Handle type="source" id="right" position={Position.Right} />
+      <Handle type="source" id="bottom" position={Position.Bottom} />
     </div>
   )
 }

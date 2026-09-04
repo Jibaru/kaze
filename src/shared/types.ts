@@ -81,6 +81,13 @@ export interface DiagramEdge {
   to: string
   protocol?: string
   label?: string
+  /**
+   * Which side of each node the line attaches to. Presentation, like
+   * `edgeStyle`: saved so the drawing survives a reload, and never serialized
+   * into `kaze-adl`, where it would be noise.
+   */
+  fromHandle?: string
+  toHandle?: string
 }
 
 /** How an edge is drawn. Presentation only — see `Diagram`. */

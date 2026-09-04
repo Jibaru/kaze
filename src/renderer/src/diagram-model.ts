@@ -61,6 +61,8 @@ export function toFlow(diagram: Diagram): { nodes: KazeNode[]; edges: KazeEdge[]
     type,
     label: e.protocol ?? e.label,
     data: e.protocol ? { protocol: e.protocol } : {},
+    ...(e.fromHandle ? { sourceHandle: e.fromHandle } : {}),
+    ...(e.toHandle ? { targetHandle: e.toHandle } : {}),
   }))
 
   return { nodes: [...groups, ...nodes], edges }
@@ -112,6 +114,8 @@ export function fromFlow(
       from: e.source,
       to: e.target,
       ...(e.data?.protocol ? { protocol: e.data.protocol } : {}),
+      ...(e.sourceHandle ? { fromHandle: e.sourceHandle } : {}),
+      ...(e.targetHandle ? { toHandle: e.targetHandle } : {}),
     })),
   }
 }

@@ -745,13 +745,42 @@ button, input, select { font-family: inherit; font-size: inherit; color: inherit
 /* ── react flow ───────────────────────────────────────────────────────── */
 .react-flow__node { font-family: var(--font-sans); }
 .react-flow__node-group { background: transparent; border: none; border-radius: 0; padding: 0; }
+/* Connection points. Big enough to aim at: the 9px dots were a 9px target,
+   and WCAG's floor for a pointer target is 24px. The visible dot stays small
+   enough not to crowd the node, and a transparent pseudo-element carries the
+   hit area — which is why it must not be given a background. */
 .react-flow__handle {
   background: var(--surface);
-  width: 9px;
-  height: 9px;
-  border: 2px solid var(--grey-500);
+  width: 14px;
+  height: 14px;
+  border: 2.5px solid var(--grey-500);
+  transition-property: background-color, border-color, scale;
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
-.react-flow__handle:hover { background: var(--primary); border-color: var(--primary); }
+.react-flow__handle::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+}
+.react-flow__handle:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  scale: 1.25;
+}
+.react-flow__handle.connecting,
+.react-flow__handle.valid {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+/* The node is what you drag; the handles are what you pull from. Showing them
+   only near the node keeps a busy diagram from looking like a pegboard. */
+.react-flow__node:hover .react-flow__handle { border-color: var(--primary); }
+
+@media (prefers-reduced-motion: reduce) {
+  .react-flow__handle:hover { scale: 1; }
+}
 .react-flow__edge-path { stroke: var(--grey-500); stroke-width: 2; }
 .react-flow__edge.selected .react-flow__edge-path { stroke: var(--primary); }
 .react-flow__edge-text { fill: var(--grey-800); font-family: var(--font-mono); font-size: 11px; }
