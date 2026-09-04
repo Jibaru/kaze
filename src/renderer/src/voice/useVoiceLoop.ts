@@ -85,7 +85,7 @@ export function useVoiceLoop({
   deviceId: string
   onUtterance: (text: string) => void
   onError: (message: string) => void
-  messages: { denied: string; nothing: string }
+  messages: { denied: string; nothing: string; empty: string }
 }) {
   /**
    * The callbacks live in a ref, not in the effect's dependencies. They close
@@ -134,9 +134,17 @@ export function useVoiceLoop({
   const generation = useRef(0)
 
   const send = useCallback(async (blob: Blob, spokeFor: number, loudest: number, mine: number) => {
-    if (spokeFor < MIN_SPEECH_MS || blob.size === 0 || loudest < MIN_THRESHOLD) {
-      // Not an error worth a message — a chair, a cough, a door — but the
-      // detector opening on nothing over and over is worth being able to see.
+    if (blob.size === 0) {
+      // Should not happen, and did: this is the shape a recording bug takes,
+      // so it says so rather than dropping you back to "listening" as though
+      // you had not spoken.
+      sending.current = false
+      setState('listening')
+      handlers.current.onError(handlers.current.messages.empty)
+      return
+    }
+    if (spokeFor < MIN_SPEECH_MS || loudest < MIN_THRESHOLD) {
+      // A chair, a cough, a door. Not worth a message.
       sending.current = false
       setState('listening')
       return
@@ -169,12 +177,18 @@ export function useVoiceLoop({
     const spokeFor = Date.now() - startedAt.current
     const loudest = peak.current
     const mine = generation.current
-    // The chunks are taken now, not read inside `onstop`. `stop()` is
-    // asynchronous, and the detector keeps ticking in the meantime: a new
-    // utterance opening in that window used to clear the array out from under
-    // the one being closed, and the recording vanished with no error anywhere.
+    // The array is taken by reference, and deliberately NOT reset here.
+    //
+    // A recorder started without a timeslice delivers its audio in a single
+    // `dataavailable` that fires *during* `stop()` — so emptying the ref at
+    // close time hands the blob no data at all, every time. (It did: the mode
+    // went "Te escucho" and straight back to "Escuchando", because an empty
+    // blob takes the one path out of `send` that says nothing.)
+    //
+    // Race-free anyway, because each recorder pushes into the array its own
+    // handler closed over: a later utterance points the ref at a new array
+    // without touching this one.
     const captured = chunks.current
-    chunks.current = []
     rec.onstop = () => {
       void send(new Blob(captured, { type: 'audio/webm' }), spokeFor, loudest, mine)
     }
@@ -274,13 +288,16 @@ export function useVoiceLoop({
           floor.current = Math.max(FLOOR_FLOOR, floor.current * 0.94 + rms * 0.06)
           open.current = speaking ? open.current + 1 : 0
           if (!sending.current && (forced.current || open.current >= OPEN_FRAMES)) {
-            chunks.current = []
             startedAt.current = Date.now()
             quietSince.current = 0
             peak.current = rms
+            // Its own array, closed over by its own handler — see
+            // `closeUtterance` for why this must not be the shared ref.
+            const buffer: Blob[] = []
+            chunks.current = buffer
             const rec = new MediaRecorder(stream.current!, { mimeType: 'audio/webm' })
             rec.ondataavailable = (e) => {
-              if (e.data.size > 0) chunks.current.push(e.data)
+              if (e.data.size > 0) buffer.push(e.data)
             }
             recorder.current = rec
             rec.start()

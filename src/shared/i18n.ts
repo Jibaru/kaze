@@ -184,6 +184,7 @@ export interface Dict {
   voiceEnabled: string
   micDenied: string
   heardNothing: string
+  recordedNothing: string
   heardNothingMic: string
   noKey: string
   turnInFlight: string
@@ -376,6 +377,7 @@ const es: Dict = {
   cancelled: 'Cancelado.',
   voiceEnabled: 'Voz activada. Mantén Espacio para hablar.',
   micDenied: 'Se denegó el acceso al micrófono.',
+  recordedNothing: 'La grabación salió vacía. Vuelve a intentarlo, o mantén espacio mientras hablas.',
   heardNothing: 'No se escuchó nada.',
   heardNothingMic: 'No se escuchó nada. ¿Está seleccionado el micrófono correcto?',
   noKey: 'No hay clave de OpenAI. Añade una en la barra inferior.',
@@ -675,6 +677,7 @@ const en: Dict = {
   cancelled: 'Cancelled.',
   voiceEnabled: 'Voice enabled. Hold Space to talk.',
   micDenied: 'Microphone access was denied.',
+  recordedNothing: 'The recording came back empty. Try again, or hold space while you speak.',
   heardNothing: 'Heard nothing.',
   heardNothingMic: 'Heard nothing — is the right microphone selected?',
   noKey: 'No OpenAI key set. Add one in the voice bar.',

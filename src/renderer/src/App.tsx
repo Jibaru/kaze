@@ -587,7 +587,7 @@ function Canvas() {
       chatSaid(said)
     },
     onError: setChatNote,
-    messages: { denied: t.micDenied, nothing: t.heardNothing },
+    messages: { denied: t.micDenied, nothing: t.heardNothing, empty: t.recordedNothing },
   })
 
   // Hold space to talk, inside the mode as well as outside it. The detector is
