@@ -25,6 +25,18 @@ something, review again, and watch that finding flip to **resolved**.
   `gpt-4o-mini-tts` out. The key is encrypted with the OS keystore and never
   leaves the main process.
 
+## Idioma
+
+La interfaz esta en espanol por defecto; el ingles se elige en la barra inferior.
+El revisor responde en el idioma de la interfaz, incluido el resumen hablado, y
+la transcripcion de voz se envia con el idioma correcto. Los nombres de servicios
+de AWS, los ids de nodo y el documento `kaze-adl` que se escribe en disco quedan
+siempre en ingles: son nombres propios o superficie legible por maquina, y un
+diseno serializado en espanol dejaria de coincidir con los hallazgos que lo
+referencian.
+
+The interface is Spanish by default; English is a click away in the status bar.
+
 ## Running it
 
 ```bash

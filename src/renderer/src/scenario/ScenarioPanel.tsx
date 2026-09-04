@@ -1,4 +1,5 @@
 import type { Scenario } from '@shared/types'
+import { useT } from '../i18n/useLocale'
 
 /**
  * The brief you are designing against. The scenario's rubric is stripped in the
@@ -13,17 +14,18 @@ export function ScenarioPanel({
   activeId: string
   onSelect: (id: string) => void
 }) {
+  const t = useT()
   const active = scenarios.find((s) => s.id === activeId)
 
   if (scenarios.length === 0) {
-    return <p className="inspector__hint">No scenarios found in the workspace.</p>
+    return <p className="inspector__hint">{t.noScenarios}</p>
   }
 
   return (
     <div className="scenario">
       <select
         className="scenario__select"
-        aria-label="Practice scenario"
+        aria-label={t.scenarioLabel}
         value={activeId}
         onChange={(e) => onSelect(e.target.value)}
       >

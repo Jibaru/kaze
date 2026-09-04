@@ -16,6 +16,8 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import type { GroupKind, NodeProps as ConfigProps, ReviewOutcome, Scenario, TurnIntent } from '@shared/types'
+import type { ReviewProblem } from '@shared/findings'
+import { LOCALE_NAMES, LOCALES, type Locale } from '@shared/i18n'
 import { emptyDiagram } from '@shared/types'
 import { getService, type ServiceSpec } from '@shared/services'
 import { ServiceNode } from './canvas/ServiceNode'
@@ -27,6 +29,7 @@ import { DesignText } from './review/DesignText'
 import { ReviewPanel } from './review/ReviewPanel'
 import { usePushToTalk } from './voice/usePushToTalk'
 import { useSpokenSummary } from './voice/useSpokenSummary'
+import { LocaleProvider, useLocale } from './i18n/useLocale'
 import {
   fromFlow,
   GROUP_DEFAULT_SIZE,
@@ -46,6 +49,7 @@ const GROUP_KINDS: GroupKind[] = ['vpc', 'az', 'subnet', 'region', 'account']
 const SEP = '\n\n'
 
 function Canvas() {
+  const { locale, t, setLocale } = useLocale()
   const [nodes, setNodes, onNodesChange] = useNodesState<KazeNode>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<KazeEdge>([])
   const [status, setStatus] = useState('')
@@ -145,8 +149,8 @@ function Canvas() {
   const save = useCallback(async () => {
     const { path } = await window.kaze.saveDiagram(diagram)
     setDirty(false)
-    setStatus(`Saved ${diagram.nodes.length} nodes · ${path}`)
-  }, [diagram])
+    setStatus(t.savedNodes(diagram.nodes.length, path))
+  }, [diagram, t])
 
   /** Freeze the current design as a numbered revision — what a review reads. */
   const snapshot = useCallback(async () => {
@@ -154,8 +158,8 @@ function Canvas() {
     setDirty(false)
     const changed =
       result.diff.addedNodes.length + result.diff.removedNodes.length + result.diff.changedProps.length
-    setStatus(`Revision ${result.revision} written · ${changed} change${changed === 1 ? '' : 's'} since the last one`)
-  }, [diagram])
+    setStatus(t.revisionWritten(result.revision, changed))
+  }, [diagram, t])
 
   const speech = useSpokenSummary()
 
@@ -170,15 +174,15 @@ function Canvas() {
   const load = useCallback(async () => {
     const diagram = await window.kaze.loadDiagram()
     if (!diagram) {
-      setStatus('Nothing saved yet.')
+      setStatus(t.nothingSaved)
       return
     }
     const flow = toFlow(diagram)
     setNodes(flow.nodes)
     setEdges(flow.edges)
     setDirty(false)
-    setStatus(`Loaded ${diagram.nodes.length} nodes, ${diagram.edges.length} edges.`)
-  }, [setNodes, setEdges])
+    setStatus(t.loaded(diagram.nodes.length, diagram.edges.length))
+  }, [setNodes, setEdges, t])
 
   // Reopen where you left off. A practice tool that forgets your diagram on
   // restart is a tool you stop opening.
@@ -214,7 +218,7 @@ function Canvas() {
           case 'turn-start':
             setTranscript('')
             setStreaming(true)
-            setStatus(event.intent === 'review' ? 'Reviewing…' : 'Thinking…')
+            setStatus(event.intent === 'review' ? t.reviewing : t.thinking)
             break
           case 'delta':
             setTranscript((t) => t + event.text)
@@ -230,17 +234,17 @@ function Canvas() {
           case 'result':
             setStatus(
               event.ok
-                ? `Done in ${Math.round((event.durationMs ?? 0) / 1000)}s · $${(event.costUSD ?? 0).toFixed(3)}`
-                : 'The turn ended with an error.',
+                ? t.doneIn(Math.round((event.durationMs ?? 0) / 1000), event.costUSD ?? 0)
+                : t.turnError,
             )
             break
           case 'turn-end':
             setStreaming(false)
-            if (event.cancelled) setStatus('Cancelled.')
+            if (event.cancelled) setStatus(t.cancelled)
             break
         }
       }),
-    [],
+    [t],
   )
 
   const runTurn = useCallback(
@@ -268,6 +272,7 @@ function Canvas() {
       if (streaming) void window.kaze.cancelTurn()
     },
     onError: setStatus,
+    messages: { denied: t.micDenied, nothing: t.heardNothing, nothingMic: t.heardNothingMic },
   })
 
   useEffect(() => {
@@ -298,11 +303,11 @@ function Canvas() {
     <div className="app">
       <aside className="rail rail--left">
         <div className="rail__section rail__section--scenario">
-          <h2 className="rail__title">Scenario</h2>
+          <h2 className="rail__title">{t.scenario}</h2>
           <ScenarioPanel scenarios={scenarios} activeId={scenarioId} onSelect={setScenarioId} />
         </div>
         <div className="rail__section">
-          <h2 className="rail__title">Boundaries</h2>
+          <h2 className="rail__title">{t.boundaries}</h2>
           <div className="chipbar">
             {GROUP_KINDS.map((k) => (
               <button key={k} className="btn btn--ghost" onClick={() => addGroup(k)}>
@@ -312,7 +317,7 @@ function Canvas() {
           </div>
         </div>
         <div className="rail__section rail__section--grow">
-          <h2 className="rail__title">Services</h2>
+          <h2 className="rail__title">{t.services}</h2>
           <Palette onAdd={(spec) => addService(spec)} />
         </div>
       </aside>
@@ -356,9 +361,9 @@ function Canvas() {
           <div className="tabs">
             {(
               [
-                ['inspector', 'Inspector'],
-                ['text', 'Design text'],
-                ['review', 'Review'],
+                ['inspector', t.tabInspector],
+                ['text', t.tabDesignText],
+                ['review', t.tabReview],
               ] as const
             ).map(([id, label]) => (
               <button
@@ -382,7 +387,7 @@ function Canvas() {
               ledger={outcome?.ledger ?? null}
               verdict={outcome?.payload?.verdict ?? null}
               revision={outcome?.revision ?? null}
-              problem={outcome?.problem ?? null}
+              problem={(outcome?.problem as ReviewProblem | undefined) ?? null}
               onSelect={selectNodes}
             />
           )}
@@ -399,27 +404,27 @@ function Canvas() {
           onMouseUp={() => mic.stopManually()}
           onMouseLeave={() => mic.stopManually()}
           disabled={streaming || !hasVoiceKey}
-          title="Hold to speak — Space for a review, Shift+Space to ask"
+          title={t.micHint}
         >
-          {mic.state === 'recording' ? 'Listening…' : mic.state === 'transcribing' ? 'Transcribing…' : 'Hold to talk'}
+          {mic.state === 'recording' ? t.listening : mic.state === 'transcribing' ? t.transcribing : t.holdToTalk}
         </button>
         <button className="btn btn--ghost" onClick={() => void runTurn('review')} disabled={streaming}>
-          {streaming ? 'Reviewing…' : 'Review'}
+          {streaming ? t.reviewing : t.review}
         </button>
         {speech.available && (
           <button className="btn btn--ghost" onClick={() => (speech.playing ? speech.stop() : speech.play())}>
-            {speech.playing ? '■ Stop' : '▶ Replay'}
+            {speech.playing ? `■ ${t.stopPlayback}` : `▶ ${t.replay}`}
           </button>
         )}
         {streaming && (
           <button className="btn btn--ghost" onClick={() => void window.kaze.cancelTurn()}>
-            Stop
+            {t.stop}
           </button>
         )}
         <input
           className="ask"
-          aria-label="Ask a question about the current design"
-          placeholder="Ask a question instead"
+          aria-label={t.askLabel}
+          placeholder={t.askPlaceholder}
           value={question}
           disabled={streaming}
           onChange={(e) => setQuestion(e.target.value)}
@@ -433,9 +438,9 @@ function Canvas() {
           <input
             className="ask"
             type="password"
-            aria-label="OpenAI API key, used only for speech"
+            aria-label={t.keyLabel}
             autoComplete="off"
-            placeholder="Paste an OpenAI key to enable voice"
+            placeholder={t.keyPlaceholder}
             value={keyDraft}
             onChange={(e) => setKeyDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -445,7 +450,7 @@ function Canvas() {
                 .then(() => {
                   setKeyDraft('')
                   setHasVoiceKey(true)
-                  setStatus('Voice enabled. Hold Space to talk.')
+                  setStatus(t.voiceEnabled)
                 })
                 .catch((err: Error) => setStatus(err.message))
             }}
@@ -454,24 +459,34 @@ function Canvas() {
         <button
           className="btn btn--ghost"
           onClick={() => void save()}
-          aria-label={dirty ? 'Save — unsaved changes' : 'Save'}
+          aria-label={dirty ? t.saveUnsaved : t.save}
         >
-          Save
+          {t.save}
           {dirty && (
-            <span className="dot" title="Unsaved changes" aria-hidden>
+            <span className="dot" title={t.unsavedChanges} aria-hidden>
               •
             </span>
           )}
         </button>
         <button className="btn btn--ghost" onClick={() => void snapshot()}>
-          Snapshot revision
+          {t.snapshot}
         </button>
         <button className="btn btn--ghost" onClick={() => void load()}>
-          Reload
+          {t.reload}
         </button>
-        <span className="statusbar__count">
-          {serviceCount} services · {edges.length} edges
-        </span>
+        <select
+          className="langselect"
+          aria-label={t.language}
+          value={locale}
+          onChange={(e) => setLocale(e.target.value as Locale)}
+        >
+          {LOCALES.map((l) => (
+            <option key={l} value={l}>
+              {LOCALE_NAMES[l]}
+            </option>
+          ))}
+        </select>
+        <span className="statusbar__count">{t.counts(serviceCount, edges.length)}</span>
         <span className="statusbar__msg" role="status" aria-live="polite">
           {mic.heard ? `“${mic.heard}”` : status}
         </span>
@@ -481,9 +496,21 @@ function Canvas() {
 }
 
 export default function App() {
+  const [locale, setLocale] = useState<Locale | null>(null)
+
+  // The language is resolved before first paint, so the interface never
+  // flashes English on its way to Spanish.
+  useEffect(() => {
+    void window.kaze.getLocale().then(setLocale)
+  }, [])
+
+  if (!locale) return null
+
   return (
-    <ReactFlowProvider>
-      <Canvas />
-    </ReactFlowProvider>
+    <LocaleProvider initial={locale}>
+      <ReactFlowProvider>
+        <Canvas />
+      </ReactFlowProvider>
+    </LocaleProvider>
   )
 }

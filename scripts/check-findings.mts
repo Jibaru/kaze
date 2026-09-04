@@ -78,10 +78,10 @@ check('drops a finding with no claim', empty.payload?.findings.length === 0)
 // Degrade, never throw.
 const noBlock = parseReview('I reviewed it and it looks fine to me.')
 check('markdown-only review still returns its text', noBlock.markdown.startsWith('I reviewed it'))
-check('markdown-only review reports the problem', noBlock.problem?.includes('did not include') === true)
+check('markdown-only review reports the problem as a code the UI can translate', noBlock.problem === 'no-block')
 
 const wrongBlock = parseReview('Review.\n\n```json\n{"not": "a payload"}\n```')
-check('a non-payload block is reported as such', wrongBlock.payload === null && wrongBlock.problem !== null)
+check('a non-payload block is reported as such', wrongBlock.payload === null && wrongBlock.problem === 'not-a-payload')
 
 const brokenJson = parseReview('Review.\n\n```json\n{"verdict": "solid", findings: [}\n```')
 check('malformed JSON does not throw', brokenJson.payload === null)

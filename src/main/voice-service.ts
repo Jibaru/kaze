@@ -61,8 +61,8 @@ export class VoiceService {
   }
 
   /** Speech to text. Returns '' for silence rather than throwing. */
-  async transcribe(audio: ArrayBuffer, mimeType: string): Promise<string> {
-    return transcribeAudio(await this.require(), audio, mimeType)
+  async transcribe(audio: ArrayBuffer, mimeType: string, language?: string): Promise<string> {
+    return transcribeAudio(await this.require(), audio, mimeType, language)
   }
 
   /** Text to speech, written next to the attempt so it can be replayed later. */

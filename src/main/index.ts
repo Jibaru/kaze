@@ -1,12 +1,13 @@
 import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron'
-import { cp, mkdir } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { cp, mkdir, writeFile } from 'node:fs/promises'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { WorkspaceStore } from './workspace-store'
 import { SessionManager } from './session-manager'
 import { VoiceService } from './voice-service'
 import { listScenarios } from './scenarios'
 import { parseReview, REPAIR_PROMPT } from '../shared/findings'
+import { dict, REPLY_LANGUAGE, SPEECH_LANGUAGE, toLocale, type Locale } from '../shared/i18n'
 import { reconcile } from '../shared/ledger'
 import type { Diagram, ReviewEvent, ReviewOutcome, TurnIntent } from '../shared/types'
 
@@ -26,6 +27,21 @@ const emit = (event: ReviewEvent) => win?.webContents.send('review:event', event
 const session = new SessionManager({ cwd: store.attemptDir(ATTEMPT), emit })
 const voice = new VoiceService(join(app.getPath('userData'), 'openai.key'))
 
+const localePath = join(app.getPath('userData'), 'locale')
+
+/**
+ * Spanish by default. A stored choice wins; otherwise the OS locale decides,
+ * which is what makes this internationalization rather than a translation.
+ */
+function currentLocale(): Locale {
+  try {
+    if (existsSync(localePath)) return toLocale(readFileSync(localePath, 'utf-8'))
+  } catch {
+    // fall through to the OS
+  }
+  return toLocale(app.getLocale())
+}
+
 /**
  * App-owned files (the skill, CLAUDE.md) are refreshed on every launch, so a new
  * app version ships a new rubric. Scenarios and attempts belong to the user and
@@ -37,10 +53,13 @@ async function scaffoldWorkspace(): Promise<void> {
 
   await cp(join(templateRoot, 'CLAUDE.md'), join(workspaceRoot, 'CLAUDE.md'), { force: true })
   await cp(join(templateRoot, '.claude'), join(workspaceRoot, '.claude'), { recursive: true, force: true })
+  // The scenarios the app ships are app content: they carry the rubric the
+  // reviewer grades against and the localized briefs, so a new app version has
+  // to be able to update them. Scenarios the user adds are never touched,
+  // because nothing here removes files that the template does not contain.
   await cp(join(templateRoot, 'scenarios'), join(workspaceRoot, 'scenarios'), {
     recursive: true,
-    force: false,
-    errorOnExist: false,
+    force: true,
   })
 
   const references = join(templateRoot, 'references')
@@ -101,14 +120,21 @@ ipcMain.handle('design:snapshot', async (_e, diagram: Diagram) => store.snapshot
 
 ipcMain.handle('workspace:path', () => store.root)
 
-ipcMain.handle('scenario:list', () => listScenarios(workspaceRoot))
+ipcMain.handle('scenario:list', () => listScenarios(workspaceRoot, currentLocale()))
+
+ipcMain.handle('locale:get', () => currentLocale())
+ipcMain.handle('locale:set', async (_e, locale: Locale) => {
+  await writeFile(localePath, locale, 'utf-8')
+})
 
 ipcMain.handle('review:cancel', () => session.cancel())
 
 ipcMain.handle('voice:has-key', () => voice.hasKey())
 ipcMain.handle('voice:set-key', (_e, key: string) => voice.setKey(key))
 ipcMain.handle('voice:transcribe', (_e, audio: ArrayBuffer, mimeType: string) =>
-  voice.transcribe(audio, mimeType),
+  // Telling the transcriber the language roughly halves the error rate on
+  // Spanish, and stops "revisa" coming back as "review".
+  voice.transcribe(audio, mimeType, SPEECH_LANGUAGE[currentLocale()]),
 )
 
 ipcMain.handle(
@@ -118,7 +144,13 @@ ipcMain.handle(
     // current, but only a review earns a revision number.
     if (intent !== 'review') {
       await store.saveDiagram(diagram, ATTEMPT)
-      const answer = await session.send(question ?? 'What do you make of the current design?', 'ask')
+      const locale = currentLocale()
+      const answer = await session.send(
+        `${question ?? 'What do you make of the current design?'}
+
+${REPLY_LANGUAGE[locale]}`,
+        'ask',
+      )
       return {
         intent,
         markdown: answer.trim(),
@@ -133,13 +165,14 @@ ipcMain.handle(
     }
 
     const snapshot = await store.snapshotRevision(diagram, ATTEMPT)
-    const text = await session.send(reviewPrompt(diagram.scenarioId, snapshot.revision), 'review')
+    const locale = currentLocale()
+    const text = await session.send(reviewPrompt(diagram.scenarioId, snapshot.revision, locale), 'review')
     let parsed = parseReview(text)
 
     if (!parsed.payload) {
       // One corrective turn before degrading to markdown-only. Cheap, and it
       // rescues the common case of a reply that trails off after the block.
-      emit({ kind: 'warning', message: `${parsed.problem} — asking for it again` })
+      emit({ kind: 'warning', message: dict(locale).askingAgain(dict(locale)[parsed.problem === 'no-block' ? 'noFindingsBlock' : 'notAPayload']) })
       const repair = await session.send(REPAIR_PROMPT, 'review')
       const repaired = parseReview(repair)
       if (repaired.payload) parsed = { ...parsed, payload: repaired.payload, problem: null }
@@ -169,13 +202,16 @@ async function speakIfPossible(text: string, revision: number): Promise<string |
     const path = VoiceService.audioPath(store.attemptDir(ATTEMPT), revision)
     return (await voice.speak(text, path)).data
   } catch (err) {
-    emit({ kind: 'warning', message: `could not speak the summary: ${err instanceof Error ? err.message : err}` })
+    const reason = err instanceof Error ? err.message : String(err)
+    emit({ kind: 'warning', message: dict(currentLocale()).couldNotSpeak(reason) })
     return null
   }
 }
 
-const reviewPrompt = (scenarioId: string, revision: number) =>
-  `Use the kaze-review skill. Review revision ${revision} of design.md against scenarios/${scenarioId}.md.`
+const reviewPrompt = (scenarioId: string, revision: number, locale: Locale) =>
+  `Use the kaze-review skill. Review revision ${revision} of design.md against scenarios/${scenarioId}.md.
+
+${REPLY_LANGUAGE[locale]}`
 
 void app.whenReady().then(async () => {
   // No stock File/Edit/View menu: this is a canvas, not a document editor.

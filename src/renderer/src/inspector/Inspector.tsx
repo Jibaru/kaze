@@ -1,6 +1,7 @@
 import { getService } from '@shared/services'
 import type { NodeProps as ConfigProps } from '@shared/types'
 import type { KazeNode } from '../diagram-model'
+import { useT } from '../i18n/useLocale'
 
 /**
  * Edits the properties the reviewer will actually argue with. Every field here
@@ -18,13 +19,13 @@ export function Inspector({
   onProps: (id: string, props: ConfigProps) => void
   onDelete: (id: string) => void
 }) {
+  const t = useT()
+
   if (!node) {
     return (
       <div className="inspector inspector--empty">
-        <p>Select a node to configure it.</p>
-        <p className="inspector__hint">
-          What you leave blank is what gets flagged — omissions are findings.
-        </p>
+        <p>{t.selectNode}</p>
+        <p className="inspector__hint">{t.selectNodeHint}</p>
       </div>
     )
   }
@@ -37,11 +38,11 @@ export function Inspector({
           <code className="inspector__id">{node.id}</code>
         </header>
         <label className="field">
-          <span>Label</span>
+          <span>{t.label}</span>
           <input value={node.data.label} onChange={(e) => onLabel(node.id, e.target.value)} />
         </label>
         <button className="btn btn--danger" onClick={() => onDelete(node.id)}>
-          Delete boundary
+          {t.deleteBoundary}
         </button>
       </div>
     )
@@ -60,7 +61,7 @@ export function Inspector({
       </header>
 
       <label className="field">
-        <span>Label</span>
+        <span>{t.label}</span>
         <input value={node.data.label} onChange={(e) => onLabel(node.id, e.target.value)} />
       </label>
 
@@ -69,16 +70,16 @@ export function Inspector({
           return (
             <label className="field field--check" key={p.key}>
               <input type="checkbox" checked={props[p.key] === true} onChange={(e) => set(p.key, e.target.checked)} />
-              <span>{p.label}</span>
+              <span>{t.prop[p.key] ?? p.key}</span>
             </label>
           )
         }
         if (p.kind === 'enum') {
           return (
             <label className="field" key={p.key}>
-              <span>{p.label}</span>
+              <span>{t.prop[p.key] ?? p.key}</span>
               <select value={String(props[p.key] ?? '')} onChange={(e) => set(p.key, e.target.value)}>
-                <option value="">— not set —</option>
+                <option value="">{t.notSet}</option>
                 {p.options.map((o) => (
                   <option key={o} value={o}>
                     {o}
@@ -90,20 +91,20 @@ export function Inspector({
         }
         return (
           <label className="field" key={p.key}>
-            <span>{p.label}</span>
+            <span>{t.prop[p.key] ?? p.key}</span>
             <input
               value={String(props[p.key] ?? '')}
-              placeholder={p.placeholder}
+              placeholder={t.propPlaceholder[p.key]}
               onChange={(e) => set(p.key, e.target.value)}
             />
           </label>
         )
       })}
 
-      {!spec?.reviewProps?.length && <p className="inspector__hint">No configurable properties for this service.</p>}
+      {!spec?.reviewProps?.length && <p className="inspector__hint">{t.noProps}</p>}
 
       <button className="btn btn--danger" onClick={() => onDelete(node.id)}>
-        Delete node
+        {t.deleteNode}
       </button>
     </div>
   )

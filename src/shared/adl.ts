@@ -8,14 +8,27 @@
  * never asked of the model, which would just re-derive them inconsistently.
  */
 import { getService } from './services'
+import { dict } from './i18n'
 import type { Diagram, DiagramNode } from './types'
 
+/**
+ * A gap carries its parts rather than a finished sentence, so the same finding
+ * can be written in English into `design.md` — which is machine-facing and must
+ * not change with the interface language — and read back to the user in theirs.
+ */
 export interface Gap {
   rule: string
-  detail: string
+  /** What the gap is about: a described node, an edge, a boundary id. */
+  subject: string
+  /** One extra fact the sentence needs, such as the AZ a node sits in. */
+  extra?: string
   /** Node or edge ids the gap points at, so the UI can highlight them. */
   refs: string[]
 }
+
+/** The English rendering, which is what the serialized design records. */
+export const gapSentence = (gap: Gap): string =>
+  dict('en').gapDetail(gap.rule, gap.subject, gap.extra)
 
 export interface DiagramDiff {
   addedNodes: string[]
@@ -85,7 +98,7 @@ export function computeGaps(diagram: Diagram): Gap[] {
     if ((degree.get(node.id) ?? 0) === 0) {
       gaps.push({
         rule: 'unconnected_node',
-        detail: `${describe(node)} has no inbound or outbound edges`,
+        subject: describe(node),
         refs: [node.id],
       })
     }
@@ -95,13 +108,14 @@ export function computeGaps(diagram: Diagram): Gap[] {
     if ((flags.statefulStore || flags.needsMultiAz) && !parentOf(diagram, node.id)) {
       gaps.push({
         rule: 'unplaced',
-        detail: `${describe(node)} sits outside every boundary, so its placement and blast radius are unstated`,
+        subject: describe(node),
         refs: [node.id],
       })
     } else if (flags.needsMultiAz && az && models(node.serviceId, MULTI_AZ_PROPS) && !hasAny(node, MULTI_AZ_PROPS)) {
       gaps.push({
         rule: 'single_az',
-        detail: `${describe(node)} sits in one AZ (${az}) with no multi_az prop`,
+        subject: describe(node),
+        extra: az,
         refs: [node.id],
       })
     }
@@ -109,7 +123,7 @@ export function computeGaps(diagram: Diagram): Gap[] {
     if (flags.needsBackup && models(node.serviceId, BACKUP_PROPS) && !hasAny(node, BACKUP_PROPS)) {
       gaps.push({
         rule: 'no_backup',
-        detail: `${describe(node)} holds state with no backup or retention policy stated`,
+        subject: describe(node),
         refs: [node.id],
       })
     }
@@ -117,7 +131,7 @@ export function computeGaps(diagram: Diagram): Gap[] {
     if (flags.needsScalingPolicy && models(node.serviceId, SCALING_PROPS) && !hasAny(node, SCALING_PROPS)) {
       gaps.push({
         rule: 'no_scaling_policy',
-        detail: `${describe(node)} has no scaling policy, so its behaviour under load is unstated`,
+        subject: describe(node),
         refs: [node.id],
       })
     }
@@ -125,7 +139,7 @@ export function computeGaps(diagram: Diagram): Gap[] {
     if (flags.entryPoint && models(node.serviceId, ['tls']) && node.props.tls !== true) {
       gaps.push({
         rule: 'untls_entrypoint',
-        detail: `${describe(node)} faces the internet with no TLS termination stated`,
+        subject: describe(node),
         refs: [node.id],
       })
     }
@@ -136,14 +150,14 @@ export function computeGaps(diagram: Diagram): Gap[] {
     if (!isSet(edge.protocol ?? '')) {
       gaps.push({
         rule: 'untyped_edge',
-        detail: `${edge.from} -> ${edge.to} has no protocol`,
+        subject: `${edge.from} -> ${edge.to}`,
         refs: [edge.id],
       })
     }
     if (!nodeIds.has(edge.from) || !nodeIds.has(edge.to)) {
       gaps.push({
         rule: 'dangling_edge',
-        detail: `${edge.from} -> ${edge.to} references a node that is not in the design`,
+        subject: `${edge.from} -> ${edge.to}`,
         refs: [edge.id],
       })
     }
@@ -155,7 +169,7 @@ export function computeGaps(diagram: Diagram): Gap[] {
     if (!occupied) {
       gaps.push({
         rule: 'empty_boundary',
-        detail: `boundary ${group.id} (${group.kind}) contains nothing`,
+        subject: `${group.id} (${group.kind})`,
         refs: [group.id],
       })
     }
@@ -165,7 +179,7 @@ export function computeGaps(diagram: Diagram): Gap[] {
   if (diagram.nodes.length > 0 && !hasObservability) {
     gaps.push({
       rule: 'no_observability',
-      detail: 'nothing in the design monitors it: no metrics, logs or alarms are shown',
+      subject: '',
       refs: [],
     })
   }
@@ -311,7 +325,7 @@ export function serialize(diagram: Diagram, options: SerializeOptions = {}): str
     const gaps = computeGaps(diagram)
     if (gaps.length) {
       out.push('gaps:')
-      for (const g of gaps) out.push(`  - ${g.rule}: ${JSON.stringify(g.detail)}`)
+      for (const g of gaps) out.push(`  - ${g.rule}: ${JSON.stringify(gapSentence(g))}`)
     } else if (diagram.nodes.length) {
       out.push('gaps: []   # nothing obviously omitted — argue about the design itself')
     }

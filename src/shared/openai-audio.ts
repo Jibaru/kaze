@@ -17,8 +17,20 @@ export const VOICE = 'alloy'
  * "elastic cash" and "multi-AZ" as "multi easy", and the review then argues with
  * words you did not say.
  */
-export const AUDIO_PROMPT =
-  'AWS system design review. Terms: VPC, availability zone, multi-AZ, ALB, ECS, Fargate, RDS, Aurora, DynamoDB, ElastiCache, Redis, S3, SQS, SNS, Lambda, CloudFront, Route 53, API Gateway, p99 latency, read replica, sharding, throughput.'
+const AWS_TERMS =
+  'VPC, availability zone, multi-AZ, ALB, ECS, Fargate, RDS, Aurora, DynamoDB, ElastiCache, Redis, S3, SQS, SNS, Lambda, CloudFront, Route 53, API Gateway, p99, read replica, sharding, throughput'
+
+export const AUDIO_PROMPT = `AWS system design review. Terms: ${AWS_TERMS}.`
+
+/**
+ * The Spanish prompt keeps the AWS terms in English, because that is how they
+ * are said out loud in Spanish too: someone saying "la base de datos es
+ * single-AZ" wants "single-AZ" back, not "una sola zona".
+ */
+const AUDIO_PROMPT_ES = `Revisión de diseño de sistemas en AWS, en español. Términos que se dicen en inglés: ${AWS_TERMS}.`
+
+const promptFor = (language?: string): string =>
+  language?.startsWith('es') ? AUDIO_PROMPT_ES : AUDIO_PROMPT
 
 /**
  * How much of a transcript may be accounted for by the vocabulary prompt before
@@ -36,13 +48,17 @@ export async function transcribeAudio(
   apiKey: string,
   audio: ArrayBuffer | Uint8Array,
   mimeType: string,
+  language?: string,
 ): Promise<string> {
   const extension = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('wav') ? 'wav' : mimeType.includes('mp3') || mimeType.includes('mpeg') ? 'mp3' : 'webm'
 
   const form = new FormData()
   form.append('file', new Blob([audio as BlobPart], { type: mimeType }), `speech.${extension}`)
   form.append('model', TRANSCRIBE_MODEL)
-  form.append('prompt', AUDIO_PROMPT)
+  form.append('prompt', promptFor(language))
+  // Naming the language stops the model guessing from the first syllable, which
+  // is where short commands get mistaken for the other language entirely.
+  if (language) form.append('language', language)
 
   const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
@@ -57,7 +73,7 @@ export async function transcribeAudio(
   // Observed live: fed unintelligible audio, the model returns the vocabulary
   // prompt verbatim. Without this guard, silence fires a review off words the
   // user never said — a failure that looks exactly like success.
-  if (isPromptEcho(text)) return ''
+  if (isPromptEcho(text, language)) return ''
   return text
 }
 
@@ -78,7 +94,8 @@ export async function synthesizeSpeech(apiKey: string, text: string): Promise<Ui
 }
 
 /** True when a transcript is just the vocabulary prompt handed back. */
-export function isPromptEcho(text: string): boolean {
+export function isPromptEcho(text: string, language?: string): boolean {
   if (!text) return true
-  return coverage(text, AUDIO_PROMPT) >= ECHO_COVERAGE || similarity(text, AUDIO_PROMPT) >= ECHO_SIMILARITY
+  const prompt = promptFor(language)
+  return coverage(text, prompt) >= ECHO_COVERAGE || similarity(text, prompt) >= ECHO_SIMILARITY
 }

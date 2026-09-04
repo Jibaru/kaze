@@ -1,10 +1,16 @@
 /** Shapes crossing the main <-> renderer boundary, and the diagram model itself. */
 
-/** A configurable property the reviewer actually cares about. */
+/**
+ * A configurable property the reviewer actually cares about.
+ *
+ * `key` is canonical and appears in the serialized design, so it never changes
+ * with the interface language; the human-readable label and placeholder live in
+ * the dictionary, keyed by it.
+ */
 export type PropSpec =
-  | { key: string; kind: 'bool'; label: string }
-  | { key: string; kind: 'text'; label: string; placeholder?: string }
-  | { key: string; kind: 'enum'; label: string; options: string[] }
+  | { key: string; kind: 'bool' }
+  | { key: string; kind: 'text' }
+  | { key: string; kind: 'enum'; options: string[] }
 
 export type Category =
   | 'Compute'
@@ -114,7 +120,7 @@ export interface ReviewOutcome {
   intent: TurnIntent
   markdown: string
   payload: import('./findings').ReviewPayload | null
-  problem: string | null
+  problem: import('./findings').ReviewProblem | null
   revision: number | null
   /** The reconciled ledger after this turn: statuses, not just findings. */
   ledger: import('./ledger').Ledger | null
@@ -138,6 +144,8 @@ export interface KazeApi {
   snapshotRevision(diagram: Diagram): Promise<RevisionResult>
   workspacePath(): Promise<string>
   listScenarios(): Promise<Scenario[]>
+  getLocale(): Promise<import('./i18n').Locale>
+  setLocale(locale: import('./i18n').Locale): Promise<void>
   /** Snapshots the design, then runs one turn against it. */
   review(diagram: Diagram, intent: TurnIntent, question?: string): Promise<ReviewOutcome>
   cancelTurn(): Promise<void>

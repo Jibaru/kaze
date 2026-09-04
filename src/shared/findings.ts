@@ -27,12 +27,17 @@ export interface ReviewPayload {
   resolved: string[]
 }
 
+export type ReviewProblem = 'no-block' | 'not-a-payload'
+
 export interface ParsedReview {
   /** The review text with the JSON block stripped — what the panel renders. */
   markdown: string
   payload: ReviewPayload | null
-  /** Why parsing failed, for the status bar. Null when it succeeded. */
-  problem: string | null
+  /**
+   * Why parsing failed. A code rather than a sentence: this reaches the panel
+   * and has to be shown in the user's language.
+   */
+  problem: ReviewProblem | null
 }
 
 const FENCED = /```(?:json)?\s*\n([\s\S]*?)\n?```/g
@@ -102,9 +107,7 @@ export function parseReview(text: string): ParsedReview {
   return {
     markdown: text.trim(),
     payload: null,
-    problem: sawJson
-      ? 'the review ended with a code block that is not a findings payload'
-      : 'the review did not include a findings block',
+    problem: sawJson ? 'not-a-payload' : 'no-block',
   }
 }
 

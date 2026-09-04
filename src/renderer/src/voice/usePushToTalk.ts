@@ -41,12 +41,15 @@ export function usePushToTalk({
   onUtterance,
   onBargeIn,
   onError,
+  messages,
 }: {
   enabled: boolean
   onUtterance: (text: string, intent: TurnIntent) => void
   /** Fires the instant a key goes down, before any audio: stop the playback. */
   onBargeIn: () => void
   onError: (message: string) => void
+  /** Passed in rather than imported, so the hook holds no opinion on language. */
+  messages: { denied: string; nothing: string; nothingMic: string }
 }) {
   const [state, setState] = useState<MicState>('idle')
   const [heard, setHeard] = useState('')
@@ -74,7 +77,7 @@ export function usePushToTalk({
           audio: { echoCancellation: true, noiseSuppression: true },
         })
       } catch {
-        onError('Microphone access was denied.')
+        onError(messages.denied)
         return
       }
 
@@ -119,7 +122,7 @@ export function usePushToTalk({
           }
           if (peak.current < SILENCE_PEAK_RMS) {
             setState('idle')
-            onError('Heard nothing — is the right microphone selected?')
+            onError(messages.nothingMic)
             return
           }
           setState('transcribing')
@@ -127,7 +130,7 @@ export function usePushToTalk({
             const text = await window.kaze.transcribe(await blob.arrayBuffer(), blob.type)
             setState('idle')
             if (!text) {
-              onError('Heard nothing.')
+              onError(messages.nothing)
               return
             }
             setHeard(text)
@@ -141,7 +144,7 @@ export function usePushToTalk({
       rec.start()
       setState('recording')
     },
-    [onUtterance, onError],
+    [onUtterance, onError, messages],
   )
 
   useEffect(() => {

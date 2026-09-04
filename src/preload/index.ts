@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import type { Diagram, KazeApi, ReviewEvent, TurnIntent } from '../shared/types'
+import type { Locale } from '../shared/i18n'
 
 /** The whole privileged surface the renderer gets. Keep it this short. */
 const api: KazeApi = {
@@ -8,6 +9,8 @@ const api: KazeApi = {
   snapshotRevision: (diagram: Diagram) => ipcRenderer.invoke('design:snapshot', diagram),
   workspacePath: () => ipcRenderer.invoke('workspace:path'),
   listScenarios: () => ipcRenderer.invoke('scenario:list'),
+  getLocale: () => ipcRenderer.invoke('locale:get'),
+  setLocale: (locale: Locale) => ipcRenderer.invoke('locale:set', locale),
   review: (diagram: Diagram, intent: TurnIntent, question?: string) =>
     ipcRenderer.invoke('review:run', diagram, intent, question),
   cancelTurn: () => ipcRenderer.invoke('review:cancel'),

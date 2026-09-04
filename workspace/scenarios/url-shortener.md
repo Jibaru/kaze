@@ -1,6 +1,7 @@
 ---
 id: url-shortener
 title: URL shortener at scale
+title_es: Acortador de URLs a escala
 difficulty: 1
 ---
 
@@ -27,6 +28,34 @@ resolving that code is redirected to the original.
 
 - AWS only, single account.
 - Budget matters: justify anything that scales with traffic rather than storage.
+
+<!-- BRIEF:es -->
+
+## Enunciado
+
+Diseña un acortador de URLs. Un usuario envía una URL larga y recibe un código
+corto; cualquiera que resuelva ese código es redirigido a la original.
+
+## Requisitos funcionales
+
+- Crear un código corto para una URL, con alias personalizado opcional.
+- Resolver un código corto a su destino mediante una redirección HTTP.
+- Reportar el número de clics por código, actualizado en aproximadamente un minuto.
+
+## Requisitos no funcionales
+
+- 100 M de redirecciones al día, con picos de unas 10 veces la media diaria durante unos minutos.
+- Latencia p99 de redirección por debajo de 100 ms, en todo el mundo.
+- Las redirecciones son de lectura intensiva: unas 500 lecturas por escritura.
+- Los códigos son permanentes. Perder el mapeo código→URL es inaceptable.
+- El conteo de clics puede ser aproximado y puede ir con retraso; el mapeo no.
+
+## Restricciones
+
+- Solo AWS, una sola cuenta.
+- El presupuesto importa: justifica todo lo que escale con el tráfico en lugar de con el almacenamiento.
+
+<!-- /BRIEF:es -->
 
 <!-- RUBRIC:START — hidden from the practitioner -->
 

@@ -25,12 +25,13 @@ export interface ServiceSpec {
   reviewProps?: PropSpec[]
 }
 
-const MULTI_AZ: PropSpec = { key: 'multi_az', kind: 'bool', label: 'Multi-AZ' }
-const BACKUP: PropSpec = { key: 'backup', kind: 'text', label: 'Backup / retention', placeholder: 'e.g. PITR, 7 days' }
-const INSTANCE: PropSpec = { key: 'instance_class', kind: 'text', label: 'Instance class', placeholder: 'e.g. db.r6g.large' }
-const REPLICAS: PropSpec = { key: 'read_replicas', kind: 'text', label: 'Read replicas', placeholder: 'e.g. 2' }
-const AUTOSCALE: PropSpec = { key: 'autoscaling', kind: 'text', label: 'Scaling policy', placeholder: 'e.g. target 60% CPU, 2-20' }
-const TLS: PropSpec = { key: 'tls', kind: 'bool', label: 'TLS terminated here' }
+/** Shared so one property means one thing across every service. */
+const MULTI_AZ: PropSpec = { key: 'multi_az', kind: 'bool' }
+const BACKUP: PropSpec = { key: 'backup', kind: 'text' }
+const INSTANCE: PropSpec = { key: 'instance_class', kind: 'text' }
+const REPLICAS: PropSpec = { key: 'read_replicas', kind: 'text' }
+const AUTOSCALE: PropSpec = { key: 'autoscaling', kind: 'text' }
+const TLS: PropSpec = { key: 'tls', kind: 'bool' }
 
 export const SERVICES: ServiceSpec[] = [
   // ── Edge ────────────────────────────────────────────────────────────────
@@ -38,24 +39,24 @@ export const SERVICES: ServiceSpec[] = [
     id: 'Route53',
     name: 'Route 53',
     category: 'Edge',
-    aliases: ['dns'],
+    aliases: ['dns', 'dominio'],
     flags: { entryPoint: true },
-    reviewProps: [{ key: 'routing_policy', kind: 'enum', label: 'Routing policy', options: ['simple', 'latency', 'failover', 'weighted', 'geo'] }],
+    reviewProps: [{ key: 'routing_policy', kind: 'enum', options: ['simple', 'latency', 'failover', 'weighted', 'geo'] }],
   },
   {
     id: 'CloudFront',
     name: 'CloudFront',
     category: 'Edge',
-    aliases: ['cdn', 'edge cache'],
+    aliases: ['cdn', 'edge cache', 'caché de borde', 'red de entrega'],
     flags: { entryPoint: true },
-    reviewProps: [{ key: 'cache_policy', kind: 'text', label: 'Cache policy', placeholder: 'e.g. 60s TTL on /r/*' }, TLS],
+    reviewProps: [{ key: 'cache_policy', kind: 'text' }, TLS],
   },
   {
     id: 'WAF',
     name: 'WAF',
     category: 'Security',
-    aliases: ['firewall'],
-    reviewProps: [{ key: 'rules', kind: 'text', label: 'Rule set', placeholder: 'e.g. rate limit 2000/5min' }],
+    aliases: ['firewall', 'cortafuegos'],
+    reviewProps: [{ key: 'rules', kind: 'text' }],
   },
 
   // ── Networking ──────────────────────────────────────────────────────────
@@ -63,17 +64,17 @@ export const SERVICES: ServiceSpec[] = [
     id: 'ALB',
     name: 'Application Load Balancer',
     category: 'Networking',
-    aliases: ['elb', 'load balancer', 'alb'],
+    aliases: ['elb', 'load balancer', 'alb', 'balanceador', 'balanceo de carga'],
     flags: { entryPoint: true },
-    reviewProps: [TLS, { key: 'health_check', kind: 'text', label: 'Health check', placeholder: 'e.g. GET /healthz' }],
+    reviewProps: [TLS, { key: 'health_check', kind: 'text' }],
   },
   {
     id: 'APIGateway',
     name: 'API Gateway',
     category: 'Networking',
-    aliases: ['rest', 'http api'],
+    aliases: ['rest', 'http api', 'api', 'pasarela'],
     flags: { entryPoint: true },
-    reviewProps: [{ key: 'throttle', kind: 'text', label: 'Throttle / quota', placeholder: 'e.g. 10k rps burst 5k' }, { key: 'authorizer', kind: 'text', label: 'Authorizer' }],
+    reviewProps: [{ key: 'throttle', kind: 'text' }, { key: 'authorizer', kind: 'text' }],
   },
 
   // ── Compute & containers ────────────────────────────────────────────────
@@ -81,17 +82,17 @@ export const SERVICES: ServiceSpec[] = [
     id: 'Lambda',
     name: 'Lambda',
     category: 'Compute',
-    aliases: ['serverless', 'function'],
+    aliases: ['serverless', 'function', 'sin servidor', 'función'],
     reviewProps: [
-      { key: 'concurrency', kind: 'text', label: 'Concurrency limit', placeholder: 'e.g. reserved 200' },
-      { key: 'timeout', kind: 'text', label: 'Timeout', placeholder: 'e.g. 30s' },
+      { key: 'concurrency', kind: 'text' },
+      { key: 'timeout', kind: 'text' },
     ],
   },
   {
     id: 'EC2',
     name: 'EC2',
     category: 'Compute',
-    aliases: ['instance', 'vm', 'server'],
+    aliases: ['instance', 'vm', 'server', 'instancia', 'servidor', 'máquina virtual'],
     flags: { needsMultiAz: true, needsScalingPolicy: true },
     reviewProps: [INSTANCE, MULTI_AZ, AUTOSCALE],
   },
@@ -99,9 +100,9 @@ export const SERVICES: ServiceSpec[] = [
     id: 'ECS',
     name: 'ECS',
     category: 'Containers',
-    aliases: ['container', 'task', 'service'],
+    aliases: ['container', 'task', 'service', 'contenedor', 'tarea', 'servicio'],
     flags: { needsMultiAz: true, needsScalingPolicy: true },
-    reviewProps: [MULTI_AZ, AUTOSCALE, { key: 'launch_type', kind: 'enum', label: 'Launch type', options: ['fargate', 'ec2'] }],
+    reviewProps: [MULTI_AZ, AUTOSCALE, { key: 'launch_type', kind: 'enum', options: ['fargate', 'ec2'] }],
   },
   {
     id: 'Fargate',
@@ -124,10 +125,10 @@ export const SERVICES: ServiceSpec[] = [
     id: 'RDS',
     name: 'RDS',
     category: 'Database',
-    aliases: ['postgres', 'mysql', 'relational', 'sql'],
+    aliases: ['postgres', 'mysql', 'relational', 'sql', 'base de datos', 'relacional'],
     flags: { statefulStore: true, needsMultiAz: true, needsBackup: true },
     reviewProps: [
-      { key: 'engine', kind: 'enum', label: 'Engine', options: ['postgres', 'mysql', 'mariadb', 'sqlserver', 'oracle'] },
+      { key: 'engine', kind: 'enum', options: ['postgres', 'mysql', 'mariadb', 'sqlserver', 'oracle'] },
       MULTI_AZ,
       REPLICAS,
       INSTANCE,
@@ -138,10 +139,10 @@ export const SERVICES: ServiceSpec[] = [
     id: 'Aurora',
     name: 'Aurora',
     category: 'Database',
-    aliases: ['serverless v2', 'relational'],
+    aliases: ['serverless v2', 'relational', 'relacional', 'base de datos'],
     flags: { statefulStore: true, needsMultiAz: true, needsBackup: true },
     reviewProps: [
-      { key: 'engine', kind: 'enum', label: 'Engine', options: ['postgres', 'mysql'] },
+      { key: 'engine', kind: 'enum', options: ['postgres', 'mysql'] },
       MULTI_AZ,
       REPLICAS,
       BACKUP,
@@ -151,12 +152,12 @@ export const SERVICES: ServiceSpec[] = [
     id: 'DynamoDB',
     name: 'DynamoDB',
     category: 'Database',
-    aliases: ['nosql', 'key value', 'ddb'],
+    aliases: ['nosql', 'key value', 'ddb', 'clave valor', 'llave valor'],
     flags: { statefulStore: true, needsBackup: true },
     reviewProps: [
-      { key: 'partition_key', kind: 'text', label: 'Partition key', placeholder: 'e.g. short_code' },
-      { key: 'capacity', kind: 'enum', label: 'Capacity', options: ['on-demand', 'provisioned'] },
-      { key: 'gsi', kind: 'text', label: 'GSIs', placeholder: 'e.g. by_user_id' },
+      { key: 'partition_key', kind: 'text' },
+      { key: 'capacity', kind: 'enum', options: ['on-demand', 'provisioned'] },
+      { key: 'gsi', kind: 'text' },
       BACKUP,
     ],
   },
@@ -164,11 +165,11 @@ export const SERVICES: ServiceSpec[] = [
     id: 'ElastiCache',
     name: 'ElastiCache',
     category: 'Database',
-    aliases: ['redis', 'memcached', 'cache'],
+    aliases: ['redis', 'memcached', 'cache', 'caché', 'memoria'],
     flags: { statefulStore: true, needsMultiAz: true },
     reviewProps: [
-      { key: 'engine', kind: 'enum', label: 'Engine', options: ['redis', 'memcached'] },
-      { key: 'eviction', kind: 'text', label: 'Eviction / TTL', placeholder: 'e.g. allkeys-lru, 1h' },
+      { key: 'engine', kind: 'enum', options: ['redis', 'memcached'] },
+      { key: 'eviction', kind: 'text' },
       MULTI_AZ,
     ],
   },
@@ -176,7 +177,7 @@ export const SERVICES: ServiceSpec[] = [
     id: 'OpenSearch',
     name: 'OpenSearch',
     category: 'Database',
-    aliases: ['elasticsearch', 'search'],
+    aliases: ['elasticsearch', 'search', 'búsqueda', 'buscador'],
     flags: { statefulStore: true, needsMultiAz: true, needsBackup: true },
     reviewProps: [MULTI_AZ, BACKUP],
   },
@@ -184,7 +185,7 @@ export const SERVICES: ServiceSpec[] = [
     id: 'Redshift',
     name: 'Redshift',
     category: 'Analytics',
-    aliases: ['warehouse', 'olap'],
+    aliases: ['warehouse', 'olap', 'almacén de datos'],
     flags: { statefulStore: true, needsBackup: true },
     reviewProps: [BACKUP],
   },
@@ -194,19 +195,19 @@ export const SERVICES: ServiceSpec[] = [
     id: 'S3',
     name: 'S3',
     category: 'Storage',
-    aliases: ['bucket', 'object storage', 'blob'],
+    aliases: ['bucket', 'object storage', 'blob', 'almacenamiento', 'objetos', 'archivos'],
     flags: { statefulStore: true, needsBackup: true },
     reviewProps: [
-      { key: 'versioning', kind: 'bool', label: 'Versioning' },
-      { key: 'lifecycle', kind: 'text', label: 'Lifecycle', placeholder: 'e.g. IA at 30d, Glacier at 90d' },
-      { key: 'encryption', kind: 'enum', label: 'Encryption', options: ['SSE-S3', 'SSE-KMS', 'none'] },
+      { key: 'versioning', kind: 'bool' },
+      { key: 'lifecycle', kind: 'text' },
+      { key: 'encryption', kind: 'enum', options: ['SSE-S3', 'SSE-KMS', 'none'] },
     ],
   },
   {
     id: 'EFS',
     name: 'EFS',
     category: 'Storage',
-    aliases: ['nfs', 'shared filesystem'],
+    aliases: ['nfs', 'shared filesystem', 'archivos compartidos', 'sistema de archivos'],
     flags: { statefulStore: true, needsBackup: true },
     reviewProps: [BACKUP],
   },
@@ -216,67 +217,67 @@ export const SERVICES: ServiceSpec[] = [
     id: 'SQS',
     name: 'SQS',
     category: 'Integration',
-    aliases: ['queue', 'buffer'],
+    aliases: ['queue', 'buffer', 'cola', 'mensajes'],
     reviewProps: [
-      { key: 'dlq', kind: 'bool', label: 'Dead-letter queue' },
-      { key: 'fifo', kind: 'bool', label: 'FIFO' },
-      { key: 'visibility_timeout', kind: 'text', label: 'Visibility timeout', placeholder: 'e.g. 30s' },
+      { key: 'dlq', kind: 'bool' },
+      { key: 'fifo', kind: 'bool' },
+      { key: 'visibility_timeout', kind: 'text' },
     ],
   },
   {
     id: 'SNS',
     name: 'SNS',
     category: 'Integration',
-    aliases: ['pubsub', 'topic', 'fanout'],
-    reviewProps: [{ key: 'dlq', kind: 'bool', label: 'Dead-letter queue' }],
+    aliases: ['pubsub', 'topic', 'fanout', 'notificaciones', 'tema'],
+    reviewProps: [{ key: 'dlq', kind: 'bool' }],
   },
   {
     id: 'EventBridge',
     name: 'EventBridge',
     category: 'Integration',
-    aliases: ['event bus', 'events'],
-    reviewProps: [{ key: 'dlq', kind: 'bool', label: 'Dead-letter queue' }],
+    aliases: ['event bus', 'events', 'eventos', 'bus de eventos'],
+    reviewProps: [{ key: 'dlq', kind: 'bool' }],
   },
   {
     id: 'StepFunctions',
     name: 'Step Functions',
     category: 'Integration',
-    aliases: ['workflow', 'orchestration', 'saga'],
-    reviewProps: [{ key: 'pattern', kind: 'text', label: 'Pattern', placeholder: 'e.g. saga with compensations' }],
+    aliases: ['workflow', 'orchestration', 'saga', 'flujo', 'orquestación'],
+    reviewProps: [{ key: 'pattern', kind: 'text' }],
   },
   {
     id: 'Kinesis',
     name: 'Kinesis Data Streams',
     category: 'Analytics',
-    aliases: ['stream', 'shard', 'ingest'],
+    aliases: ['stream', 'shard', 'ingest', 'flujo', 'ingesta', 'streaming'],
     reviewProps: [
-      { key: 'shards', kind: 'text', label: 'Shards', placeholder: 'e.g. 16' },
-      { key: 'retention', kind: 'text', label: 'Retention', placeholder: 'e.g. 24h' },
+      { key: 'shards', kind: 'text' },
+      { key: 'retention', kind: 'text' },
     ],
   },
-  { id: 'Glue', name: 'Glue', category: 'Analytics', aliases: ['etl'] },
-  { id: 'Athena', name: 'Athena', category: 'Analytics', aliases: ['query', 'sql on s3'] },
+  { id: 'Glue', name: 'Glue', category: 'Analytics', aliases: ['etl', 'transformación'] },
+  { id: 'Athena', name: 'Athena', category: 'Analytics', aliases: ['query', 'sql on s3', 'consultas'] },
 
   // ── Security & observability ────────────────────────────────────────────
   {
     id: 'Cognito',
     name: 'Cognito',
     category: 'Security',
-    aliases: ['auth', 'identity', 'users'],
+    aliases: ['auth', 'identity', 'users', 'autenticación', 'identidad', 'usuarios'],
   },
   {
     id: 'SecretsManager',
     name: 'Secrets Manager',
     category: 'Security',
-    aliases: ['secrets', 'credentials'],
-    reviewProps: [{ key: 'rotation', kind: 'bool', label: 'Rotation enabled' }],
+    aliases: ['secrets', 'credentials', 'secretos', 'credenciales'],
+    reviewProps: [{ key: 'rotation', kind: 'bool' }],
   },
   {
     id: 'CloudWatch',
     name: 'CloudWatch',
     category: 'Observability',
-    aliases: ['metrics', 'logs', 'alarms', 'monitoring'],
-    reviewProps: [{ key: 'alarms', kind: 'text', label: 'Alarms', placeholder: 'e.g. p99 > 200ms for 5m' }],
+    aliases: ['metrics', 'logs', 'alarms', 'monitoring', 'métricas', 'registros', 'alarmas', 'monitoreo'],
+    reviewProps: [{ key: 'alarms', kind: 'text' }],
   },
 ]
 
@@ -297,11 +298,19 @@ export const CATEGORIES: Category[] = [
   'Observability',
 ]
 
-/** Palette search: name, id and synonyms, so "redis" finds ElastiCache. */
+/**
+ * Palette search: name, id and synonyms in both languages, so "redis" and
+ * "caché" both find ElastiCache. Accents are folded, because nobody reaches for
+ * the accent key mid-search.
+ */
+const fold = (text: string): string =>
+  text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+
 export function searchServices(query: string): ServiceSpec[] {
-  const q = query.trim().toLowerCase()
+  const q = fold(query.trim())
   if (!q) return SERVICES
-  return SERVICES.filter((s) =>
-    [s.name, s.id, ...(s.aliases ?? [])].some((t) => t.toLowerCase().includes(q)),
-  )
+  return SERVICES.filter((s) => [s.name, s.id, ...(s.aliases ?? [])].some((t) => fold(t).includes(q)))
 }

@@ -822,3 +822,19 @@ button, input, select { font-family: inherit; font-size: inherit; color: inherit
   .mic--recording::before { opacity: 1; transform: none; }
   .btn:active { scale: 1; }
 }
+
+/* Language selector. Small, but a real control: it sits with the other status
+   bar actions rather than hiding in a settings screen nobody opens. */
+.langselect {
+  flex: none;
+  min-height: 36px;
+  padding: 0 8px;
+  background: transparent;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.langselect:hover { background: var(--surface-hover); color: var(--text); }
+.langselect:focus { outline: none; border-color: var(--primary); }

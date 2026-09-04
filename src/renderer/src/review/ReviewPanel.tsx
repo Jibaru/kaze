@@ -1,18 +1,21 @@
 import { useState } from 'react'
 import { openEntries, resolvedEntries, sortEntries, type Ledger, type LedgerEntry } from '@shared/ledger'
+import type { ReviewProblem } from '@shared/findings'
+import type { Dict } from '@shared/i18n'
+import { useT } from '../i18n/useLocale'
 
-const VERDICT_LABEL: Record<string, string> = {
-  solid: 'Solid',
-  needs_work: 'Needs work',
-  does_not_meet_brief: 'Does not meet the brief',
-}
+const verdictLabel = (t: Dict, verdict: string): string =>
+  ({ solid: t.verdictSolid, needs_work: t.verdictNeedsWork, does_not_meet_brief: t.verdictDoesNotMeet })[
+    verdict
+  ] ?? verdict
 
-const STATUS_LABEL: Record<string, string> = {
-  new: 'new',
-  open: 'still open',
-  regressed: 'regressed',
-  resolved: 'fixed',
-}
+const statusLabel = (t: Dict, status: string): string =>
+  ({ new: t.statusNew, open: t.statusOpen, regressed: t.statusRegressed, resolved: t.statusFixed })[
+    status
+  ] ?? status
+
+const problemLabel = (t: Dict, problem: ReviewProblem): string =>
+  problem === 'no-block' ? t.noFindingsBlock : t.notAPayload
 
 /**
  * The review as a ledger rather than a list. Watching "single point of failure
@@ -34,19 +37,17 @@ export function ReviewPanel({
   ledger: Ledger | null
   verdict: string | null
   revision: number | null
-  problem: string | null
+  problem: ReviewProblem | null
   onSelect: (ids: string[]) => void
 }) {
+  const t = useT()
   const [showTranscript, setShowTranscript] = useState(false)
 
   if (!streaming && !transcript && !ledger) {
     return (
       <div className="inspector inspector--empty">
-        <p>No review yet.</p>
-        <p className="inspector__hint">
-          Draw a design, then ask for a review. Each one is a numbered revision, so the next review can
-          tell you whether what you changed actually worked.
-        </p>
+        <p>{t.noReview}</p>
+        <p className="inspector__hint">{t.noReviewHint}</p>
       </div>
     )
   }
@@ -58,20 +59,20 @@ export function ReviewPanel({
     <div className="reviewpanel">
       {verdict && (
         <div className={`verdict verdict--${verdict}`}>
-          <span className="verdict__label">{VERDICT_LABEL[verdict] ?? verdict}</span>
-          {revision !== null && <span className="verdict__rev">revision {revision}</span>}
+          <span className="verdict__label">{verdictLabel(t, verdict)}</span>
+          {revision !== null && <span className="verdict__rev">{t.revisionN(revision)}</span>}
         </div>
       )}
 
-      {problem && <p className="notice">{problem}</p>}
+      {problem && <p className="notice">{problemLabel(t, problem)}</p>}
 
-      {fixed.length > 0 && <FixedStrip entries={fixed} onSelect={onSelect} />}
+      {fixed.length > 0 && <FixedStrip entries={fixed} onSelect={onSelect} t={t} />}
 
       {open.length > 0 && (
         <ul className="findings">
           {open.map((entry) => (
             <li key={entry.id}>
-              <FindingRow entry={entry} onSelect={onSelect} />
+              <FindingRow entry={entry} onSelect={onSelect} t={t} />
             </li>
           ))}
         </ul>
@@ -82,7 +83,8 @@ export function ReviewPanel({
         aria-expanded={showTranscript || streaming}
         onClick={() => setShowTranscript((v) => !v)}
       >
-        {showTranscript ? '▾' : '▸'} Transcript {streaming && <span className="pulse" aria-label="streaming" />}
+        {showTranscript ? '▾' : '▸'} {t.transcript}{' '}
+        {streaming && <span className="pulse" aria-label={t.reviewing} />}
       </button>
       {(showTranscript || streaming) && <div className="transcript">{transcript || '…'}</div>}
     </div>
@@ -90,16 +92,16 @@ export function ReviewPanel({
 }
 
 /** Fixed findings collapse: the win is worth seeing, the detail is not. */
-function FixedStrip({ entries, onSelect }: { entries: LedgerEntry[]; onSelect: (ids: string[]) => void }) {
+function FixedStrip({ entries, onSelect, t }: { entries: LedgerEntry[]; onSelect: (ids: string[]) => void; t: Dict }) {
   const [expanded, setExpanded] = useState(false)
   const declared = entries.filter((e) => e.resolvedBy === 'declared').length
 
   return (
     <div className="fixed">
       <button className="fixed__head" aria-expanded={expanded} onClick={() => setExpanded((v) => !v)}>
-        {expanded ? '▾' : '▸'} Fixed ({entries.length})
+        {expanded ? '▾' : '▸'} {t.fixedCount(entries.length)}
         {declared < entries.length && (
-          <span className="fixed__note">{entries.length - declared} no longer raised</span>
+          <span className="fixed__note">{t.noLongerRaisedCount(entries.length - declared)}</span>
         )}
       </button>
       {expanded && (
@@ -110,8 +112,8 @@ function FixedStrip({ entries, onSelect }: { entries: LedgerEntry[]; onSelect: (
                 <span className="fixed__claim">{e.claim}</span>
                 <span className="fixed__meta">
                   {e.resolvedBy === 'declared'
-                    ? `fixed in revision ${e.resolvedAtRevision}`
-                    : `no longer raised as of revision ${e.resolvedAtRevision}`}
+                    ? t.fixedInRevision(e.resolvedAtRevision ?? 0)
+                    : t.noLongerRaisedAt(e.resolvedAtRevision ?? 0)}
                 </span>
               </button>
             </li>
@@ -122,7 +124,7 @@ function FixedStrip({ entries, onSelect }: { entries: LedgerEntry[]; onSelect: (
   )
 }
 
-function FindingRow({ entry, onSelect }: { entry: LedgerEntry; onSelect: (ids: string[]) => void }) {
+function FindingRow({ entry, onSelect, t }: { entry: LedgerEntry; onSelect: (ids: string[]) => void; t: Dict }) {
   const age = entry.lastSeenRevision - entry.firstSeenRevision
 
   return (
@@ -132,12 +134,12 @@ function FindingRow({ entry, onSelect }: { entry: LedgerEntry; onSelect: (ids: s
       disabled={entry.nodes.length === 0}
     >
       <span className="finding__meta">
-        <span className={`finding__status finding__status--${entry.status}`}>{STATUS_LABEL[entry.status]}</span>
+        <span className={`finding__status finding__status--${entry.status}`}>{statusLabel(t, entry.status)}</span>
         <span className="finding__severity">{entry.severity}</span>
         <span className="finding__pillar">{entry.pillar}</span>
         {entry.bp_id && <span className="finding__bp">{entry.bp_id}</span>}
         {entry.nodes.length > 0 && <span className="finding__nodes">{entry.nodes.join(' ')}</span>}
-        {age > 0 && <span className="finding__age">unfixed for {age} revision{age === 1 ? '' : 's'}</span>}
+        {age > 0 && <span className="finding__age">{t.unfixedFor(age)}</span>}
       </span>
       <span className="finding__claim">{entry.claim}</span>
       {entry.fix && <span className="finding__fix">{entry.fix}</span>}
