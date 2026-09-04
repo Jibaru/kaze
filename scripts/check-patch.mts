@@ -41,8 +41,14 @@ const cache = added.diagram.nodes.find((n) => n.serviceId === 'ElastiCache')
 check('adds a service', cache !== undefined)
 check('an alias added in the patch can be wired up',
   added.diagram.edges.some((e) => e.from === 'n1' && e.to === cache?.id && e.protocol === 'RESP'))
-check('the app places the new node, near what the fix was about',
-  cache?.x === 360 && cache?.y === 250, `${cache?.x},${cache?.y}`)
+// Asserted as properties rather than coordinates: where exactly a box lands is
+// the app's business and has been changed once already, but "beside the thing
+// the fix was about, and not on top of anything" is the actual contract.
+const anchor = base.nodes.find((n) => n.id === 'n1')!
+check('the app places the new node beside what the fix was about',
+  cache!.x > anchor.x && cache!.x - anchor.x < 400, `${cache?.x},${cache?.y}`)
+check('and does not drop it on top of an existing one',
+  !added.diagram.nodes.some((n) => n.id !== cache!.id && Math.abs(n.x - cache!.x) < 210 && Math.abs(n.y - cache!.y) < 100))
 check('a node added beside one inside a boundary joins that boundary', cache?.parentId === 'az-a')
 
 check('types an existing connection',

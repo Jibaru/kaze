@@ -156,6 +156,30 @@ export interface ReviewOutcome {
   audio: string | null
 }
 
+/**
+ * One exchange in conversation mode: what to say, what to draw, and the audio.
+ *
+ * The operations are proposals — the renderer validates and applies them the
+ * same way it does an autofix, and tells the next turn what it refused.
+ */
+export interface ChatTurn {
+  say: string
+  ops: import('./patch').PatchOp[]
+  /**
+   * Which utterance the audio chunks belong to. The speech is streamed on
+   * `chat:audio` as it is generated — it starts arriving *before* this reply
+   * does — so the player keys on this rather than waiting to be handed a file.
+   */
+  audioSeq: number
+}
+
+/** One slice of streamed speech. `chunk` is null when the utterance is over. */
+export interface ChatAudio {
+  seq: number
+  /** base64 PCM: 24 kHz, signed 16-bit little-endian, mono. */
+  chunk: string | null
+}
+
 /** What the app needs to pick an attempt back up after a restart. */
 export interface AttemptMeta {
   /** The Claude Code conversation this attempt has been running in. */
@@ -205,6 +229,14 @@ export interface KazeApi {
   newSession(): Promise<{ archivedTo: string } | { cancelled: true }>
   /** Operations that answer one finding. The renderer validates and applies them. */
   proposeFix(claim: string, fix: string): Promise<import('./patch').PatchOp[]>
+  /** Enter conversation mode: frames the case, draws nothing. */
+  openChat(diagram: Diagram): Promise<ChatTurn>
+  /** One spoken exchange. `refused` is what the app rejected last turn. */
+  sayToChat(said: string, refused: string[]): Promise<ChatTurn>
+  /** Streamed speech for conversation mode. Returns the unsubscribe. */
+  onChatAudio(handler: (audio: ChatAudio) => void): () => void
+  /** Leaving the mode: lets go of the process it was holding open. */
+  closeChat(): Promise<void>
   hasVoiceKey(): Promise<boolean>
   setVoiceKey(key: string): Promise<void>
   transcribe(audio: ArrayBuffer, mimeType: string): Promise<string>

@@ -17,7 +17,7 @@ import {
   type NodeTypes,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import type { GroupKind, NodeProps as ConfigProps, ReviewOutcome, Scenario, TurnIntent } from '@shared/types'
+import type { ChatTurn, GroupKind, NodeProps as ConfigProps, ReviewOutcome, Scenario, TurnIntent } from '@shared/types'
 import type { ReviewProblem } from '@shared/findings'
 import type { LedgerEntry } from '@shared/ledger'
 import { LOCALE_NAMES, LOCALES, type Locale } from '@shared/i18n'
@@ -30,7 +30,10 @@ import { Palette } from './palette/Palette'
 import { ScenarioPanel } from './scenario/ScenarioPanel'
 import { Inspector } from './inspector/Inspector'
 import { EdgeInspector } from './inspector/EdgeInspector'
-import { applyPatch } from '@shared/patch'
+import { ConversationBar, type ChatState } from './conversation/ConversationBar'
+import { useVoiceLoop } from './voice/useVoiceLoop'
+import { useStreamedSpeech } from './voice/useStreamedSpeech'
+import { applyPatch, type PatchOp } from '@shared/patch'
 import { serialize } from '@shared/adl'
 import { Toast } from './toast/Toast'
 import { DesignText } from './review/DesignText'
@@ -82,6 +85,16 @@ function Canvas() {
   const [hasVoiceKey, setHasVoiceKey] = useState(false)
   /** Mirrors the preference main holds; main is the one that decides. */
   const [fast, setFast] = useState(false)
+  /**
+   * Conversation mode. `null` when off — the mode owns its own transcript and
+   * throws it away on exit, because the diagram is what it produced and the
+   * diagram is what you keep.
+   */
+  const [chat, setChat] = useState<{ say: string; busy: boolean; refused: string[] } | null>(null)
+  const [muted, setMuted] = useState(false)
+  /** Read inside a callback that must not re-register on every turn. */
+  const chatRef = useRef(chat)
+  chatRef.current = chat
   const [keyDraft, setKeyDraft] = useState('')
   const [dirty, setDirty] = useState(false)
   const wrapper = useRef<HTMLDivElement>(null)
@@ -492,8 +505,101 @@ function Canvas() {
     [diagram, speech],
   )
 
+  /**
+   * Conversation mode.
+   *
+   * The loop is: it speaks, you answer, it draws and speaks again. The
+   * operations go through the same validation as an autofix — the model
+   * proposes, the app decides — and whatever the app refuses is handed to the
+   * next turn, so it stops referring to a box that was never drawn.
+   *
+   * The microphone is open except while the app is busy or talking. It could
+   * listen through its own speech and let you cut in, and echo cancellation
+   * would probably hold; "probably" is the wrong word for a loop that could
+   * transcribe its own voice and reply to itself, so barge-in is the button
+   * instead.
+   */
+  const diagramRef = useRef(diagram)
+  diagramRef.current = diagram
+
+  const applyOps = useCallback(
+    (ops: PatchOp[]): string[] => {
+      if (ops.length === 0) return []
+      const result = applyPatch(diagramRef.current, ops)
+      if (result.applied.length > 0) {
+        const flow = toFlow(result.diagram)
+        setNodes(flow.nodes)
+        setEdges(flow.edges)
+        markDirty()
+      }
+      return result.rejected.map((r) => r.reason)
+    },
+    [setNodes, setEdges, markDirty],
+  )
+
+  // The speech has been arriving on its own channel since before this reply
+  // did, so landing a turn is only the drawing and the caption.
+  const chatSpeech = useStreamedSpeech()
+
+  const landChatTurn = useCallback(
+    (turn: ChatTurn) => {
+      const refused = applyOps(turn.ops)
+      setChat((c) => (c ? { say: turn.say, busy: false, refused } : c))
+    },
+    [applyOps],
+  )
+
+  const chatSaid = useCallback(
+    (said: string) => {
+      const refused = chatRef.current?.refused ?? []
+      setChat((c) => (c ? { ...c, busy: true } : c))
+      window.kaze
+        .sayToChat(said, refused)
+        .then(landChatTurn)
+        .catch((err: Error) => {
+          setStatus(err.message)
+          setChat((c) => (c ? { ...c, busy: false } : c))
+        })
+    },
+    [landChatTurn],
+  )
+
+  const loop = useVoiceLoop({
+    active: chat !== null && !chat.busy && !muted && !chatSpeech.playing,
+    onUtterance: chatSaid,
+    onError: setStatus,
+    messages: { denied: t.micDenied, nothing: t.heardNothing },
+  })
+
+  const enterChat = useCallback(async () => {
+    if (!hasVoiceKey) {
+      setStatus(t.chatNoKey)
+      return
+    }
+    setMuted(false)
+    setChat({ say: '', busy: true, refused: [] })
+    try {
+      landChatTurn(await window.kaze.openChat(diagramRef.current))
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : String(err))
+      setChat(null)
+    }
+  }, [hasVoiceKey, landChatTurn, t])
+
+  const exitChat = useCallback(() => {
+    chatSpeech.stop()
+    setChat(null)
+    void window.kaze.closeChat()
+  }, [chatSpeech])
+
+  // The device is let go when the mode closes. A microphone light that stays on
+  // after you left is a promise the app has broken.
+  useEffect(() => {
+    if (!chat) loop.release()
+  }, [chat, loop.release])
+
   const mic = usePushToTalk({
-    enabled: hasVoiceKey && !streaming,
+    enabled: hasVoiceKey && !streaming && !chat,
     onUtterance: (text, intent) => void runTurn(intent, intent === 'ask' ? text : undefined),
     onBargeIn: () => {
       speech.stop()
@@ -535,8 +641,29 @@ function Canvas() {
     return () => window.removeEventListener('keydown', onKey)
   }, [save, runTurn, streaming])
 
+  /**
+   * What it is doing, most transient first. `muted` is a resting state and the
+   * others are things happening, so a muted microphone must not hide the fact
+   * that it is mid-sentence — muting stops it hearing you, not talking to you.
+   */
+  const chatState: ChatState = chatSpeech.playing
+    ? 'speaking'
+    : chat?.busy
+      ? 'thinking'
+      : loop.state === 'transcribing'
+        ? 'transcribing'
+        : muted
+          ? 'muted'
+          : loop.state === 'hearing'
+            ? 'hearing'
+            : 'listening'
+
   return (
-    <div className="app">
+    // Conversation mode is a class, not a different tree: the canvas keeps its
+    // instance, its viewport and everything React Flow has measured, and the
+    // rails simply stop being drawn. Remounting the canvas to hide a sidebar
+    // would refit the diagram in front of you every time you entered.
+    <div className={`app${chat ? ' app--chat' : ''}`}>
       <aside className="rail rail--left">
         <div className="rail__section rail__section--scenario">
           <h2 className="rail__title">{t.scenario}</h2>
@@ -668,6 +795,19 @@ function Canvas() {
         </div>
       </aside>
 
+      {chat && (
+        <ConversationBar
+          state={chatState}
+          muted={muted}
+          level={loop.level}
+          say={chat.say}
+          heard={loop.heard}
+          onToggleMute={() => setMuted((m) => !m)}
+          onInterrupt={() => chatSpeech.stop()}
+          onExit={exitChat}
+        />
+      )}
+
       <Toast message={toast} onDismiss={() => setToast(null)} />
 
       <footer className="statusbar">
@@ -690,6 +830,9 @@ function Canvas() {
         {/* Next to the button it changes the meaning of, not filed away in a
             menu: it is worth seeing which kind of review you are about to get
             at the moment you ask for one. */}
+        <button className="btn btn--ghost" onClick={() => void enterChat()} disabled={streaming} title={t.chatModeHint}>
+          {t.chatMode}
+        </button>
         <button
           className={`btn btn--ghost fasttoggle${fast ? ' fasttoggle--on' : ''}`}
           onClick={toggleFast}

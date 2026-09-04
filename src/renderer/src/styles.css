@@ -1383,3 +1383,161 @@ button, input, select { font-family: inherit; font-size: inherit; color: inherit
 .fasttoggle--on .fasttoggle__bolt {
   fill: currentColor;
 }
+
+/* ── conversation mode ────────────────────────────────────────────────
+   The grid collapses to one cell and the rails stop being drawn. The
+   canvas element is untouched, so React Flow keeps its viewport and
+   nothing refits under you on the way in or out. */
+.app--chat {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+  grid-template-areas: 'canvas';
+}
+.app--chat .rail,
+.app--chat .statusbar,
+.app--chat .canvasbar,
+.app--chat .react-flow__controls,
+.app--chat .react-flow__minimap {
+  display: none;
+}
+
+.chatbar {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: min(760px, calc(100vw - 64px));
+  pointer-events: none;
+}
+.chatbar > * {
+  pointer-events: auto;
+}
+
+.chatbar__captions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  max-width: 100%;
+}
+/* What it said carries the conversation, so it is the one that gets size.
+   What it heard is a receipt: you read it only when it got you wrong. */
+.chatbar__say {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 12px 20px;
+  box-shadow: 0 6px 24px rgb(60 64 67 / 18%);
+}
+.chatbar__heard {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--grey-700);
+  background: rgb(255 255 255 / 82%);
+  border-radius: 12px;
+  padding: 5px 12px;
+}
+.chatbar__who {
+  font-weight: 500;
+  color: var(--grey-500);
+}
+
+.chatbar__controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 8px 10px;
+  box-shadow: 0 6px 24px rgb(60 64 67 / 18%);
+}
+.chatbar__mute svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+}
+.chatbar__mute {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.chatbar__mute--on {
+  color: var(--danger-ink);
+  border-color: var(--danger-ink);
+}
+.chatbar__slash {
+  stroke-width: 2;
+}
+
+/* The one thing on screen that moves while nothing else does. A
+   conversation with no sign of life reads as broken long before it is. */
+.chatstate {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--grey-700);
+  padding: 8px 14px 8px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.chatstate:hover { background: var(--grey-100); }
+.chatstate__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--grey-500);
+  flex: none;
+}
+.chatstate__ring {
+  position: absolute;
+  left: 8px;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.16;
+  transition: transform 80ms linear;
+}
+.chatstate--listening { color: var(--primary); }
+.chatstate--listening .chatstate__dot { background: var(--primary); }
+.chatstate--hearing { color: var(--primary-hover); }
+.chatstate--hearing .chatstate__dot { background: var(--primary-hover); }
+.chatstate--speaking .chatstate__dot { background: var(--success-ink, #137333); }
+.chatstate--muted { color: var(--danger-ink); }
+.chatstate--muted .chatstate__dot { background: var(--danger-ink); }
+.chatstate--muted .chatstate__ring { display: none; }
+
+.chatstate__ellipsis::after {
+  content: '…';
+  animation: kaze-ellipsis 1.2s steps(4, end) infinite;
+}
+@keyframes kaze-ellipsis {
+  0% { opacity: 0.25; }
+  50% { opacity: 1; }
+  100% { opacity: 0.25; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chatstate__ellipsis::after { animation: none; }
+  .chatstate__ring { transition: none; }
+}

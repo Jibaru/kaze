@@ -5,9 +5,11 @@
  * the reviewer runs under — it has read-only tools and never writes a file —
  * and it matters more here, because a patch changes the thing being graded.
  *
- * So the operation set is deliberately small and there is no `remove_node`: a
- * fix should add structure or state a property, and a suggestion that silently
- * deletes part of your design is not a fix you can review. Every reference is
+ * So the operation set is deliberately small, and `remove_node` is off by
+ * default: a *fix* should add structure or state a property, and a suggestion
+ * that silently deletes part of your design is not a fix you can review.
+ * Conversation mode turns it on, because there the model is drawing what you
+ * just said and "quita el balanceador" has to mean something. Every reference is
  * checked against the manifest and the current diagram before anything is
  * applied, and an operation that fails validation is dropped rather than
  * guessed at, with the reason kept so the panel can say what it refused.
@@ -25,6 +27,8 @@ export type PatchOp =
   | { op: 'set_protocol'; from: string; to: string; protocol: string }
   /** Move a node into a boundary, or out of every boundary with `null`. */
   | { op: 'move_node'; node: string; into: string | null }
+  /** Only where the caller asks for it — see `ParseOptions`. */
+  | { op: 'remove_node'; node: string }
   | { op: 'add_boundary'; kind: GroupKind; label?: string; as?: string }
 
 export interface PatchResult {
@@ -43,8 +47,17 @@ const KNOWN_OPS = new Set([
   'add_boundary',
 ])
 
+export interface ParseOptions {
+  /**
+   * Let the model take a node out. False everywhere except conversation mode,
+   * where the diagram is being built by the conversation rather than by you,
+   * and refusing to undo something it drew a minute ago would be absurd.
+   */
+  allowRemoveNode?: boolean
+}
+
 /** Coerce the model's JSON into operations, dropping anything unrecognised. */
-export function parsePatch(value: unknown): PatchOp[] {
+export function parsePatch(value: unknown, options: ParseOptions = {}): PatchOp[] {
   const list = Array.isArray(value)
     ? value
     : Array.isArray((value as { operations?: unknown })?.operations)
@@ -53,8 +66,45 @@ export function parsePatch(value: unknown): PatchOp[] {
   return list.filter((op): op is PatchOp => {
     if (!op || typeof op !== 'object') return false
     const name = (op as { op?: unknown }).op
-    return typeof name === 'string' && KNOWN_OPS.has(name)
+    if (typeof name !== 'string') return false
+    if (name === 'remove_node') return options.allowRemoveNode === true
+    return KNOWN_OPS.has(name)
   })
+}
+
+/**
+ * Where a new node goes.
+ *
+ * The old rule — anchor plus a fixed offset — was fine when a patch added one
+ * box to a diagram you had laid out yourself. Conversation mode adds several a
+ * minute to a canvas nobody has arranged, and a fixed offset piles them on top
+ * of each other. So: start beside the anchor (or at the next grid slot when
+ * there is none) and step down until the space is actually free.
+ *
+ * Still the app's decision, not the model's. Coordinates are not something it
+ * can reason about, and asking would only spend a round trip on a worse answer.
+ */
+const CELL = { x: 260, y: 150 }
+const CLEAR = { x: 210, y: 100 }
+
+function placeNode(
+  taken: Array<{ x: number; y: number }>,
+  anchor: { x: number; y: number } | undefined,
+  count: number,
+): { x: number; y: number } {
+  let x = anchor ? anchor.x + CELL.x : 120 + (count % 4) * CELL.x
+  let y = anchor ? anchor.y : 120 + Math.floor(count / 4) * CELL.y
+  // Bounded: a diagram dense enough to exhaust this is past the point where
+  // another overlap is the problem.
+  for (let i = 0; i < 40; i++) {
+    if (!taken.some((n) => Math.abs(n.x - x) < CLEAR.x && Math.abs(n.y - y) < CLEAR.y)) break
+    y += CELL.y
+    if (i === 19) {
+      x += CELL.x
+      y = anchor ? anchor.y : 120
+    }
+  }
+  return { x, y }
 }
 
 const nextId = (taken: Set<string>, prefix: string): string => {
@@ -124,16 +174,14 @@ export function applyPatch(diagram: Diagram, ops: PatchOp[]): PatchResult {
         ids.add(id)
         if (op.as) aliases.set(op.as, id)
         const { kept } = allowedProps(op.service, op.props ?? {})
+        const at = placeNode(nodes, anchor, nodes.length)
         nodes.push({
           id,
           serviceId: op.service,
           label: op.label?.trim() || getService(op.service)!.name,
           props: kept,
-          // Placed by the app, not by the model: coordinates are not something
-          // it can reason about, and a pile of nodes at the origin is worse
-          // than a predictable offset from whatever the fix was about.
-          x: (anchor?.x ?? 120) + 260,
-          y: (anchor?.y ?? 120) + 150,
+          x: at.x,
+          y: at.y,
           ...(anchor?.parentId ? { parentId: anchor.parentId } : {}),
         })
         applied.push(`+ ${op.service} (${id})`)
@@ -221,6 +269,24 @@ export function applyPatch(diagram: Diagram, ops: PatchOp[]): PatchResult {
         }
         node.parentId = target
         applied.push(`${node.id} into ${target}`)
+        break
+      }
+
+      case 'remove_node': {
+        const node = findNode(op.node)
+        if (!node) {
+          reject(`no such node: ${op.node}`)
+          break
+        }
+        nodes.splice(nodes.indexOf(node), 1)
+        ids.delete(node.id)
+        // Its connections go with it, or the design keeps lines to a box that
+        // is not there and every later gap is about the wreckage.
+        const orphaned = edges.filter((e) => e.from === node.id || e.to === node.id).length
+        for (let i = edges.length - 1; i >= 0; i--) {
+          if (edges[i]!.from === node.id || edges[i]!.to === node.id) edges.splice(i, 1)
+        }
+        applied.push(`- ${node.id}${orphaned ? ` (${orphaned})` : ''}`)
         break
       }
     }

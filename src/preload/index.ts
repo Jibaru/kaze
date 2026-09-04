@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
-import type { Diagram, KazeApi, ReviewEvent, TurnIntent } from '../shared/types'
+import type { ChatAudio, Diagram, KazeApi, ReviewEvent, TurnIntent } from '../shared/types'
 import type { Locale } from '../shared/i18n'
 
 /** The whole privileged surface the renderer gets. Keep it this short. */
@@ -25,6 +25,14 @@ const api: KazeApi = {
   cancelTurn: () => ipcRenderer.invoke('review:cancel'),
   newSession: () => ipcRenderer.invoke('attempt:new'),
   proposeFix: (claim: string, fix: string) => ipcRenderer.invoke('review:fix', claim, fix),
+  openChat: (diagram: Diagram) => ipcRenderer.invoke('chat:open', diagram),
+  sayToChat: (said: string, refused: string[]) => ipcRenderer.invoke('chat:say', said, refused),
+  onChatAudio: (handler: (audio: ChatAudio) => void) => {
+    const listener = (_e: IpcRendererEvent, audio: ChatAudio) => handler(audio)
+    ipcRenderer.on('chat:audio', listener)
+    return () => ipcRenderer.off('chat:audio', listener)
+  },
+  closeChat: () => ipcRenderer.invoke('chat:close'),
   hasVoiceKey: () => ipcRenderer.invoke('voice:has-key'),
   setVoiceKey: (key: string) => ipcRenderer.invoke('voice:set-key', key),
   transcribe: (audio: ArrayBuffer, mimeType: string) => ipcRenderer.invoke('voice:transcribe', audio, mimeType),

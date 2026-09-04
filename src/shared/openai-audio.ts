@@ -10,6 +10,17 @@ import { coverage, similarity } from './text'
 
 export const TRANSCRIBE_MODEL = 'gpt-4o-transcribe'
 export const SPEECH_MODEL = 'gpt-4o-mini-tts'
+/**
+ * The one conversation mode uses. `tts-1` is the older, plainer voice and it
+ * starts returning audio sooner, which is the only thing that matters when
+ * somebody is waiting mid-sentence. The review summary keeps the better model:
+ * you have already waited half a minute for the review, and nobody is holding a
+ * conversation with it.
+ */
+export const FAST_SPEECH_MODEL = 'tts-1'
+
+/** Raw PCM from the API: 24 kHz, signed 16-bit little-endian, mono. */
+export const PCM_SAMPLE_RATE = 24_000
 export const VOICE = 'alloy'
 
 /**
@@ -77,20 +88,60 @@ export async function transcribeAudio(
   return text
 }
 
-export async function synthesizeSpeech(apiKey: string, text: string): Promise<Uint8Array> {
+async function speechResponse(
+  apiKey: string,
+  text: string,
+  model: string,
+  format: 'mp3' | 'pcm',
+): Promise<Response> {
   const response = await fetch('https://api.openai.com/v1/audio/speech', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: SPEECH_MODEL,
+      model,
       voice: VOICE,
       input: text,
-      response_format: 'mp3',
+      response_format: format,
+      // Only the newer model takes them, and it silently ignores the field
+      // rather than failing, which is why this is not conditional.
       instructions: SPEECH_INSTRUCTIONS,
     }),
   })
   if (!response.ok) throw new Error(`speech failed (${response.status}): ${await response.text()}`)
-  return new Uint8Array(await response.arrayBuffer())
+  return response
+}
+
+export async function synthesizeSpeech(apiKey: string, text: string): Promise<Uint8Array> {
+  return new Uint8Array(await (await speechResponse(apiKey, text, SPEECH_MODEL, 'mp3')).arrayBuffer())
+}
+
+/**
+ * Speech as it is generated, rather than once it is finished.
+ *
+ * Measured on a thirty-word reply: waiting for the whole file costs about four
+ * seconds, of which roughly three are spent holding audio that already exists.
+ * In a review that is nothing. In a conversation it is the difference between
+ * an answer and a pause.
+ *
+ * PCM rather than mp3 because the renderer can schedule raw samples straight
+ * into an AudioContext; playing a partial mp3 needs Media Source Extensions and
+ * a container that tolerates being cut anywhere, and neither is worth it for
+ * audio nobody keeps.
+ */
+export async function streamSpeech(
+  apiKey: string,
+  text: string,
+  onChunk: (chunk: Uint8Array) => void,
+): Promise<void> {
+  const response = await speechResponse(apiKey, text, FAST_SPEECH_MODEL, 'pcm')
+  const body = response.body
+  if (!body) throw new Error('speech stream had no body')
+  const reader = body.getReader()
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    if (value?.length) onChunk(value)
+  }
 }
 
 /** True when a transcript is just the vocabulary prompt handed back. */

@@ -54,7 +54,7 @@ const DISALLOWED = [
  * carries every file the reviewer would have opened, and a tool call is a round
  * trip that fast mode exists to avoid.
  */
-const FAST_DISALLOWED = [
+export const FAST_DISALLOWED = [
   ...DISALLOWED,
   ...ALLOWED,
   'TodoWrite', 'SlashCommand', 'BashOutput', 'KillShell', 'Artifact',
@@ -68,7 +68,14 @@ const FAST_DISALLOWED = [
 export interface FastTurn {
   /** Replaces the Claude Code preset outright. */
   system: string
-  /** Start the fast conversation over. A review is a fresh judgement. */
+  /**
+   * Which fast conversation this turn belongs to. Reviews and the design
+   * conversation are different discussions with different system prompts, and
+   * resuming one into the other would produce a transcript that reads as
+   * neither.
+   */
+  key: string
+  /** Start that conversation over. A review is a fresh judgement. */
   fresh?: boolean
 }
 
@@ -85,13 +92,15 @@ export interface SessionManagerOptions {
 export class SessionManager {
   private sessionId: string | null = null
   /**
-   * Fast turns run in their own conversation, kept apart from the attempt's.
-   * Mixing them would put a toolless, system-prompt-replaced turn in the middle
-   * of the transcript the slow reviewer resumes, and it is never written to
-   * disk: it is worth continuing across a couple of follow-up questions, and
-   * worth nothing after a restart.
+   * Fast turns run in their own conversations, kept apart from the attempt's
+   * and from each other. Mixing them would put a toolless,
+   * system-prompt-replaced turn in the middle of the transcript the slow
+   * reviewer resumes; none of them is written to disk, because each is worth
+   * continuing across a few follow-ups and worth nothing after a restart.
    */
-  private fastSessionId: string | null = null
+  private readonly fastSessions = new Map<string, string>()
+  /** The conversation the turn in flight belongs to. */
+  private fastKey: string | null = null
   private abort: AbortController | null = null
   private readonly cwd: string
   private readonly emit: (event: ReviewEvent) => void
@@ -124,7 +133,7 @@ export class SessionManager {
   reset(): void {
     this.cancel()
     this.sessionId = null
-    this.fastSessionId = null
+    this.fastSessions.clear()
   }
 
   /** Continue a conversation from a previous run of the app. */
@@ -194,7 +203,8 @@ export class SessionManager {
       }),
     }
     if (this.claudePath) base.pathToClaudeCodeExecutable = this.claudePath
-    if (this.fastSessionId) base.resume = this.fastSessionId
+    const resume = this.fastSessions.get(this.fastKey!)
+    if (resume) base.resume = resume
     return base
   }
 
@@ -203,11 +213,24 @@ export class SessionManager {
    * Throws only on a genuine failure; a cancelled turn resolves with what it
    * had, so a barge-in still leaves a readable transcript.
    */
-  async send(prompt: string, intent: TurnIntent, fast?: FastTurn): Promise<string> {
+  async send(
+    prompt: string,
+    intent: TurnIntent,
+    fast?: FastTurn,
+    /**
+     * Every chunk of assistant text, as it arrives. Conversation mode uses it
+     * to start speaking the moment the spoken half of a reply is finished,
+     * rather than waiting for the operations that follow it — about two seconds
+     * of a seven-second turn, which is the difference between a conversation
+     * and a form submission.
+     */
+    onDelta?: (chunk: string) => void,
+  ): Promise<string> {
     if (this.abort) throw new Error('a turn is already in flight')
     const abort = new AbortController()
     this.abort = abort
-    if (fast?.fresh) this.fastSessionId = null
+    this.fastKey = fast?.key ?? null
+    if (fast?.fresh) this.fastSessions.delete(fast.key)
 
     let text = ''
     this.emit({ kind: 'turn-start', intent })
@@ -217,6 +240,12 @@ export class SessionManager {
       const options = fast ? this.fastOptions(fast.system) : this.options()
       for await (const message of query({ prompt, options: { ...options, abortController: abort } })) {
         if (abort.signal.aborted) break
+        if (onDelta && message.type === 'stream_event') {
+          const event = message.event as { type?: string; delta?: { type?: string; text?: string } }
+          if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta' && event.delta.text) {
+            onDelta(event.delta.text)
+          }
+        }
         this.consume(message, Boolean(fast), (chunk) => {
           // Separate blocks are separate paragraphs. Concatenated flush, a
           // block that opens with a heading lands mid-line — "…the ledger.##
@@ -259,7 +288,7 @@ export class SessionManager {
         // Not emitted: the caller persists this id as the attempt's
         // conversation, and resuming a toolless turn as the full reviewer is
         // exactly the kind of quiet mix-up that would be hard to see later.
-        this.fastSessionId = message.session_id
+        if (this.fastKey) this.fastSessions.set(this.fastKey, message.session_id)
         return
       }
       this.sessionId = message.session_id
@@ -284,8 +313,11 @@ export class SessionManager {
     }
 
     if (message.type === 'result') {
-      if (fast) this.fastSessionId ??= message.session_id
-      else this.sessionId ??= message.session_id
+      if (fast) {
+        if (this.fastKey && !this.fastSessions.has(this.fastKey)) {
+          this.fastSessions.set(this.fastKey, message.session_id)
+        }
+      } else this.sessionId ??= message.session_id
       this.emit({
         kind: 'result',
         ok: message.subtype === 'success',

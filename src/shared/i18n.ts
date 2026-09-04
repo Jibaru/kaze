@@ -137,6 +137,17 @@ export interface Dict {
   review: string
   reviewing: string
   thinking: string
+  chatMode: string
+  chatModeHint: string
+  chatState: Record<string, string>
+  chatYou: string
+  chatMute: string
+  chatUnmute: string
+  chatMuteHint: string
+  chatInterrupt: string
+  chatExit: string
+  chatNoKey: string
+  chatDrew: (changes: string) => string
   fastMode: string
   fastModeHint: string
   fastModeOn: string
@@ -303,6 +314,25 @@ const es: Dict = {
   review: 'Revisar',
   reviewing: 'Revisando…',
   thinking: 'Pensando…',
+  chatMode: 'Conversar',
+  chatModeHint:
+    'Modo conversación: solo el diagrama, micrófono abierto. Le dices qué añadir y lo dibuja. Sales cuando quieras.',
+  chatState: {
+    listening: 'Escuchando',
+    hearing: 'Te escucho',
+    transcribing: 'Transcribiendo',
+    thinking: 'Pensando',
+    speaking: 'Hablando',
+    muted: 'Micrófono apagado',
+  },
+  chatYou: 'Tú:',
+  chatMute: 'Silenciar',
+  chatUnmute: 'Activar',
+  chatMuteHint: 'Apagar o encender el micrófono. Mientras habla, púlsalo para interrumpir.',
+  chatInterrupt: 'Interrumpir y hablar',
+  chatExit: 'Salir',
+  chatNoKey: 'El modo conversación necesita la clave de OpenAI para oír y hablar.',
+  chatDrew: (changes) => `Dibujado: ${changes}`,
   fastMode: 'Rápido',
   fastModeHint:
     'Modo rápido: la revisión llega en una sola vuelta, sin abrir archivos ni consultar la documentación de AWS. Menos hallazgos y sin ids de best practice, pero mucho antes.',
@@ -581,6 +611,25 @@ const en: Dict = {
   review: 'Review',
   reviewing: 'Reviewing…',
   thinking: 'Thinking…',
+  chatMode: 'Converse',
+  chatModeHint:
+    'Conversation mode: the diagram and nothing else, microphone open. Tell it what to add and it draws. Leave whenever you like.',
+  chatState: {
+    listening: 'Listening',
+    hearing: 'Hearing you',
+    transcribing: 'Transcribing',
+    thinking: 'Thinking',
+    speaking: 'Speaking',
+    muted: 'Microphone off',
+  },
+  chatYou: 'You:',
+  chatMute: 'Mute',
+  chatUnmute: 'Unmute',
+  chatMuteHint: 'Turn the microphone off or on. While it is speaking, press to interrupt.',
+  chatInterrupt: 'Interrupt and speak',
+  chatExit: 'Leave',
+  chatNoKey: 'Conversation mode needs the OpenAI key to hear and speak.',
+  chatDrew: (changes) => `Drew: ${changes}`,
   fastMode: 'Fast',
   fastModeHint:
     'Fast mode: the review comes back in a single round trip, with no files opened and no AWS documentation consulted. Fewer findings and no best-practice ids, but far sooner.',

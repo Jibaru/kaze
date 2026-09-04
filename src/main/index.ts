@@ -3,10 +3,18 @@ import { cp, mkdir, writeFile } from 'node:fs/promises'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { WorkspaceStore } from './workspace-store'
-import { SessionManager } from './session-manager'
+import { FAST_DISALLOWED, SessionManager } from './session-manager'
+import { LiveSession } from './live-session'
 import { VoiceService } from './voice-service'
 import { listScenarios, readScenarioSource } from './scenarios'
 import { authorPrompt, parseAuthored, writeScenario } from './scenario-author'
+import {
+  CONVERSATION_SYSTEM,
+  conversationOpening,
+  conversationTurn,
+  spokenHalf,
+  spokenHalfComplete,
+} from './conversation'
 import {
   FAST_ASK_SYSTEM,
   FAST_REVIEW_SYSTEM,
@@ -19,9 +27,15 @@ import { parsePatch, type PatchOp } from '../shared/patch'
 import { dict, REPLY_LANGUAGE, SPEECH_LANGUAGE, toLocale, type Locale } from '../shared/i18n'
 import { reconcile } from '../shared/ledger'
 import type { Ledger } from '../shared/ledger'
-import type { Diagram, ReviewEvent, ReviewOutcome, RevisionResult, TurnIntent } from '../shared/types'
+import type { ChatTurn, Diagram, ReviewEvent, ReviewOutcome, RevisionResult, TurnIntent } from '../shared/types'
 
 const ATTEMPT = 'default'
+
+/**
+ * The fast conversation the reviewer runs in. Conversation mode does not use
+ * one: it holds a live process of its own, see `live-session.ts`.
+ */
+const REVIEW_CHAT = 'review'
 
 const workspaceRoot = join(app.getPath('userData'), 'workspace')
 const store = new WorkspaceStore(workspaceRoot)
@@ -45,6 +59,20 @@ const session = new SessionManager({
   },
 })
 const voice = new VoiceService(join(app.getPath('userData'), 'openai.key'))
+
+/**
+ * Conversation mode keeps one CLI process alive for the whole session.
+ * Measured: starting a query per turn cost about two seconds before the first
+ * token, which in a conversation is two seconds of silence. See
+ * `live-session.ts` for why it is a separate object rather than a mode on the
+ * reviewer's.
+ */
+const live = new LiveSession({
+  cwd: store.attemptDir(ATTEMPT),
+  system: CONVERSATION_SYSTEM,
+  disallowedTools: FAST_DISALLOWED,
+  onWarning: (message) => emit({ kind: 'warning', message }),
+})
 
 /**
  * Authoring runs in its own session, at the workspace root rather than inside an
@@ -312,7 +340,7 @@ ipcMain.handle(
             'ask',
             // Not `fresh`: a question continues whatever the last fast turn
             // said, which is what makes "and why?" work.
-            { system: FAST_ASK_SYSTEM },
+            { system: FAST_ASK_SYSTEM, key: REVIEW_CHAT },
           )
         : await session.send(`${asked}
 
@@ -329,7 +357,7 @@ ${REPLY_LANGUAGE[locale]}`, 'ask')
         // A question never disturbs the ledger, but the panel still shows it.
         ledger,
         // An answer is spoken too — otherwise asking by voice gets a silent reply.
-        audio: await speakIfPossible(answer.trim(), 0),
+        audio: await speakIfPossible(answer.trim(), VoiceService.audioPath(store.attemptDir(ATTEMPT), 0)),
       }
     }
 
@@ -339,7 +367,7 @@ ${REPLY_LANGUAGE[locale]}`, 'ask')
     // stands now, and the continuity that matters between revisions is the
     // ledger, which is written into the prompt. That also keeps the tenth
     // review as quick as the first.
-    const turn = fast ? { system: FAST_REVIEW_SYSTEM, fresh: true } : undefined
+    const turn = fast ? { system: FAST_REVIEW_SYSTEM, key: REVIEW_CHAT, fresh: true } : undefined
     const text = fast
       ? await session.send(
           fastReviewPrompt(
@@ -356,7 +384,7 @@ ${REPLY_LANGUAGE[locale]}`, 'ask')
       // rescues the common case of a reply that trails off after the block.
       emit({ kind: 'warning', message: dict(locale).askingAgain(dict(locale)[parsed.problem === 'no-block' ? 'noFindingsBlock' : 'notAPayload']) })
       // Continues the turn it is repairing, so `fresh` is deliberately dropped.
-      const repair = await session.send(REPAIR_PROMPT, 'review', fast ? { system: FAST_REVIEW_SYSTEM } : undefined)
+      const repair = await session.send(REPAIR_PROMPT, 'review', fast ? { system: FAST_REVIEW_SYSTEM, key: REVIEW_CHAT } : undefined)
       const repaired = parseReview(repair)
       if (repaired.payload) parsed = { ...parsed, payload: repaired.payload, problem: null }
     }
@@ -366,7 +394,10 @@ ${REPLY_LANGUAGE[locale]}`, 'ask')
       await store.saveLedger(ledger, ATTEMPT)
     }
     const audio = parsed.payload?.spoken_summary
-      ? await speakIfPossible(parsed.payload.spoken_summary, snapshot.revision)
+      ? await speakIfPossible(
+          parsed.payload.spoken_summary,
+          VoiceService.audioPath(store.attemptDir(ATTEMPT), snapshot.revision),
+        )
       : null
 
     return { intent, ...parsed, revision: snapshot.revision, ledger, audio }
@@ -377,11 +408,10 @@ ${REPLY_LANGUAGE[locale]}`, 'ask')
  * Voice is an enhancement, never a dependency: no key, a network failure or a
  * bad response must leave the written review intact.
  */
-async function speakIfPossible(text: string, revision: number): Promise<string | null> {
+async function speakIfPossible(text: string, path: string): Promise<string | null> {
   if (!text) return null
   try {
     if (!(await voice.hasKey())) return null
-    const path = VoiceService.audioPath(store.attemptDir(ATTEMPT), revision)
     return (await voice.speak(text, path)).data
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err)
@@ -389,6 +419,98 @@ async function speakIfPossible(text: string, revision: number): Promise<string |
     return null
   }
 }
+
+/**
+ * Conversation mode.
+ *
+ * `chat:open` frames the case and draws nothing; `chat:say` is one exchange.
+ * Both run one fast turn and hand back three things: what to say, what to draw,
+ * and the audio.
+ *
+ * The speech is started the instant the spoken half of the reply is finished,
+ * while the operations are still arriving. That is roughly two seconds of a
+ * seven-second turn, and in a conversation two seconds of silence is the
+ * difference between talking to something and waiting for it.
+ */
+let chatAudioSeq = 0
+
+/**
+ * Speak a line of the conversation, streaming it to the renderer as it is
+ * generated rather than handing over a finished file.
+ *
+ * Voice stays an enhancement: no key, or a network failure, and the turn still
+ * lands with its text and its operations.
+ */
+async function speakInto(text: string, seq: number): Promise<void> {
+  if (!text) return
+  try {
+    if (!(await voice.hasKey())) return
+    await voice.speakStreaming(text, (chunk) => {
+      win?.webContents.send('chat:audio', { seq, chunk: Buffer.from(chunk).toString('base64') })
+    })
+  } catch (err) {
+    emit({ kind: 'warning', message: dict(currentLocale()).couldNotSpeak(err instanceof Error ? err.message : String(err)) })
+  } finally {
+    win?.webContents.send('chat:audio', { seq, chunk: null })
+  }
+}
+
+async function chatTurn(prompt: string, fresh: boolean): Promise<ChatTurn> {
+  if (fresh) live.close()
+  const seq = ++chatAudioSeq
+  let spoken: Promise<void> | null = null
+  const speak = (text: string) => {
+    if (!spoken && text) spoken = speakInto(text, seq)
+  }
+
+  emit({ kind: 'turn-start', intent: 'ask' })
+  let seen = ''
+  let text = ''
+  try {
+    text = await live.say(prompt, (chunk) => {
+      seen += chunk
+      emit({ kind: 'delta', text: chunk })
+      // The moment the spoken half is finished — while the operations are
+      // still arriving — the synthesizer is already working on it.
+      if (spokenHalfComplete(seen)) speak(spokenHalf(seen))
+    })
+  } finally {
+    emit({ kind: 'turn-end', intent: 'ask', cancelled: false })
+  }
+
+  const say = spokenHalf(text)
+  // A reply that never opened a fence is all prose; speak it now.
+  speak(say)
+
+  return {
+    say,
+    audioSeq: seq,
+    // Conversation mode is the one place the model may take something out: it
+    // drew the box a minute ago, and "quita el balanceador" has to work.
+    ops: parsePatch(lastFencedJson(text), { allowRemoveNode: true }),
+  }
+}
+
+ipcMain.handle('chat:open', async (_e, diagram: Diagram): Promise<ChatTurn> => {
+  await store.saveDiagram(diagram, ATTEMPT)
+  const locale = currentLocale()
+  return chatTurn(
+    conversationOpening({
+      scenario: await readScenarioSource(workspaceRoot, diagram.scenarioId),
+      diagram,
+      locale,
+    }),
+    true,
+  )
+})
+
+ipcMain.handle('chat:say', (_e, said: string, refused: string[] = []): Promise<ChatTurn> =>
+  chatTurn(conversationTurn(said, refused), false),
+)
+
+// Leaving the mode lets the process go. Holding a CLI open for a conversation
+// nobody is having is the kind of thing you only notice in Task Manager.
+ipcMain.handle('chat:close', () => live.close())
 
 /**
  * Everything a fast turn would otherwise have opened a file to read. Assembled
@@ -431,6 +553,7 @@ void app.whenReady().then(async () => {
 })
 
 app.on('window-all-closed', () => {
+  live.close()
   session.cancel()
   if (process.platform !== 'darwin') app.quit()
 })

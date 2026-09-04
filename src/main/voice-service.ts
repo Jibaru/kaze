@@ -2,7 +2,7 @@ import { safeStorage } from 'electron'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { synthesizeSpeech, transcribeAudio } from '../shared/openai-audio'
+import { streamSpeech, synthesizeSpeech, transcribeAudio } from '../shared/openai-audio'
 
 /**
  * Owns the OpenAI credential and the audio files. The protocol lives in
@@ -71,6 +71,15 @@ export class VoiceService {
     await mkdir(dirname(outputPath), { recursive: true })
     await writeFile(outputPath, bytes)
     return { path: outputPath, data: Buffer.from(bytes).toString('base64') }
+  }
+
+  /**
+   * Speech as it arrives. Nothing is written to disk: a line of a conversation
+   * is not something you replay, and waiting for a file before playing it is
+   * exactly the wait this exists to remove.
+   */
+  async speakStreaming(text: string, onChunk: (chunk: Uint8Array) => void): Promise<void> {
+    await streamSpeech(await this.require(), text, onChunk)
   }
 
   static audioPath(attemptDir: string, revision: number): string {
