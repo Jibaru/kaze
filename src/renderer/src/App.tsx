@@ -29,6 +29,7 @@ import { DesignText } from './review/DesignText'
 import { ReviewPanel } from './review/ReviewPanel'
 import { usePushToTalk } from './voice/usePushToTalk'
 import { useSpokenSummary } from './voice/useSpokenSummary'
+import { AskPopover } from './voice/AskPopover'
 import { LocaleProvider, useLocale } from './i18n/useLocale'
 import {
   fromFlow,
@@ -57,7 +58,6 @@ function Canvas() {
   const [transcript, setTranscript] = useState('')
   const [outcome, setOutcome] = useState<ReviewOutcome | null>(null)
   const [streaming, setStreaming] = useState(false)
-  const [question, setQuestion] = useState('')
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [scenarioId, setScenarioId] = useState('')
   const [hasVoiceKey, setHasVoiceKey] = useState(false)
@@ -441,19 +441,7 @@ function Canvas() {
             {t.stop}
           </button>
         )}
-        <input
-          className="ask"
-          aria-label={t.askLabel}
-          placeholder={t.askPlaceholder}
-          value={question}
-          disabled={streaming}
-          onChange={(e) => setQuestion(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key !== 'Enter' || !question.trim()) return
-            void runTurn('ask', question.trim())
-            setQuestion('')
-          }}
-        />
+        <AskPopover disabled={streaming} onAsk={(text) => void runTurn('ask', text)} />
         {!hasVoiceKey && (
           <input
             className="ask"

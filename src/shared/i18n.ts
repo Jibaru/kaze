@@ -102,8 +102,10 @@ export interface Dict {
   stop: string
   replay: string
   stopPlayback: string
+  askButton: string
   askPlaceholder: string
   askLabel: string
+  askHint: string
   keyPlaceholder: string
   keyLabel: string
   save: string
@@ -218,8 +220,10 @@ const es: Dict = {
   stop: 'Detener',
   replay: 'Repetir',
   stopPlayback: 'Detener audio',
-  askPlaceholder: 'O escribe una pregunta',
+  askButton: 'Preguntar',
+  askPlaceholder: 'Escribe tu pregunta',
   askLabel: 'Preguntar sobre el diseño actual',
+  askHint: 'Intro para enviar · Esc para cerrar',
   keyPlaceholder: 'Pega una clave de OpenAI para activar la voz',
   keyLabel: 'Clave de API de OpenAI, usada solo para voz',
   save: 'Guardar',
@@ -445,8 +449,10 @@ const en: Dict = {
   stop: 'Stop',
   replay: 'Replay',
   stopPlayback: 'Stop audio',
-  askPlaceholder: 'Ask a question instead',
+  askButton: 'Ask',
+  askPlaceholder: 'Type your question',
   askLabel: 'Ask a question about the current design',
+  askHint: 'Enter to send · Esc to close',
   keyPlaceholder: 'Paste an OpenAI key to enable voice',
   keyLabel: 'OpenAI API key, used only for speech',
   save: 'Save',
