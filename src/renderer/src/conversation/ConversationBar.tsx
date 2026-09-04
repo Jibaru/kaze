@@ -99,34 +99,34 @@ export function ConversationBar({
             <span className="chatbar__who">{t.chatYou}</span> {heard}
           </p>
         )}
-        {say && <p className="chatbar__say">{say}</p>}
+        {say && (
+          <p className={`chatbar__say${busy ? ' chatbar__say--stale' : ''}`}>
+            {say}
+            {/* Under the last thing it said, because that is where you are
+                already looking while you wait for the next one. */}
+            {busy && <span className="chatbar__working" aria-hidden />}
+          </p>
+        )}
       </div>
 
-      <div className="chatbar__controls">
-        {/* Live, because it is the one thing on screen that changes without
-            the canvas changing. A conversation with no sign of life reads as
-            broken long before it actually is. */}
-        <button
-          className={`chatstate chatstate--${state}`}
-          onClick={state === 'speaking' ? onInterrupt : onToggleMute}
-          onKeyDown={holdKey}
-          aria-live="polite"
-          title={state === 'speaking' ? t.chatInterrupt : t.chatMuteHint}
-        >
-          <span
-            className="chatstate__ring"
-            style={{ transform: `scale(${1 + (state === 'hearing' ? level * 0.5 : 0)})` }}
-            aria-hidden
-          />
-          <span className="chatstate__dot" aria-hidden />
-          {t.chatState[state]}
-          {busy && <span className="chatstate__ellipsis" aria-hidden />}
-        </button>
+      {/* The state, as the largest thing in the chrome.
+          It used to be small grey text in the button row, which is a fine
+          place for something you look up and a useless one for the only
+          question you have while you wait: is it doing anything? */}
+      <button
+        className={`chatstate chatstate--${state}`}
+        onClick={state === 'speaking' ? onInterrupt : onToggleMute}
+        onKeyDown={holdKey}
+        aria-live="polite"
+        title={state === 'speaking' ? t.chatInterrupt : t.chatMuteHint}
+      >
+        <span className="chatstate__mark" aria-hidden>
+          {busy ? <span className="chatstate__spinner" /> : <span className="chatstate__dot" />}
+        </span>
+        {t.chatState[state]}
+      </button>
 
-        {/* Always on screen, not only while it is recording.
-            "I spoke and nothing happened" and "I spoke and it did not hear me"
-            look identical without this, and only one of them is fixable by
-            speaking up. Half scale is the level at which it starts listening. */}
+      <div className="chatbar__controls">
         {inputs.length > 1 && (
           <select
             className="chatbar__device"
@@ -143,9 +143,16 @@ export function ConversationBar({
           </select>
         )}
 
+        {/* Always on screen, not only while it is recording.
+            "I spoke and nothing happened" and "I spoke and it did not hear me"
+            look identical without this, and only one of them is fixable by
+            speaking up. Half scale is the level at which it starts listening. */}
         <span className="meter" title={t.chatMeterHint} aria-hidden>
           {[0.14, 0.34, 0.54, 0.74, 0.94].map((at) => (
-            <span key={at} className={`meter__bar${level >= at ? ' meter__bar--lit' : ''}${at >= 0.5 ? ' meter__bar--over' : ''}`} />
+            <span
+              key={at}
+              className={`meter__bar${level >= at ? ' meter__bar--lit' : ''}${at >= 0.5 ? ' meter__bar--over' : ''}`}
+            />
           ))}
         </span>
 
