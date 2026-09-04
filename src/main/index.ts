@@ -133,6 +133,8 @@ ipcMain.handle('scenario:list', () => listScenarios(workspaceRoot, currentLocale
 
 ipcMain.handle('scenario:reveal', () => shell.openPath(join(workspaceRoot, 'scenarios')))
 
+ipcMain.handle('scenario:cancel', () => author.cancel())
+
 ipcMain.handle(
   'scenario:create',
   async (_e, topic: string, difficulty: number): Promise<{ id: string } | { error: string }> => {

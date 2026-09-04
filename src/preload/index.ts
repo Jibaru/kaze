@@ -12,6 +12,7 @@ const api: KazeApi = {
   createScenario: (topic: string, difficulty: number) =>
     ipcRenderer.invoke('scenario:create', topic, difficulty),
   revealScenarios: () => ipcRenderer.invoke('scenario:reveal'),
+  cancelScenario: () => ipcRenderer.invoke('scenario:cancel'),
   getLocale: () => ipcRenderer.invoke('locale:get'),
   setLocale: (locale: Locale) => ipcRenderer.invoke('locale:set', locale),
   review: (diagram: Diagram, intent: TurnIntent, question?: string) =>

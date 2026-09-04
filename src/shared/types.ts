@@ -147,6 +147,8 @@ export interface KazeApi {
   /** Asks the model to write a scenario, rubric included, and stores it. */
   createScenario(topic: string, difficulty: number): Promise<{ id: string } | { error: string }>
   revealScenarios(): Promise<string>
+  /** Abandon an authoring turn: closing the dialog should not leave it running. */
+  cancelScenario(): Promise<void>
   getLocale(): Promise<import('./i18n').Locale>
   setLocale(locale: import('./i18n').Locale): Promise<void>
   /** Snapshots the design, then runs one turn against it. */

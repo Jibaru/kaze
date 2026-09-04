@@ -7,11 +7,20 @@
  *
  * Usage: launch with --remote-debugging-port=9222, then
  *   node scripts/drive-ui.mjs '<javascript expression>'
+ *   node scripts/drive-ui.mjs --key Escape
+ *
+ * `--key` sends a *trusted* key event through CDP. Synthetic KeyboardEvents
+ * dispatched from page script cannot trigger user-agent behaviour — Escape
+ * closing a <dialog>, for one — so testing that with dispatchEvent silently
+ * reports a failure that isn't there. Unlike SendKeys this is scoped to this
+ * page, so it cannot land in another window.
  */
 const PORT = process.env.KAZE_CDP_PORT ?? '9222'
-const expression = process.argv[2]
-if (!expression) {
-  console.error('usage: node scripts/drive-ui.mjs "<expression>"')
+const keyMode = process.argv[2] === '--key'
+const expression = keyMode ? null : process.argv[2]
+const key = keyMode ? process.argv[3] : null
+if (!expression && !key) {
+  console.error('usage: node scripts/drive-ui.mjs "<expression>" | --key <Key>')
   process.exit(2)
 }
 
@@ -28,23 +37,33 @@ await new Promise((ok, fail) => {
   ws.addEventListener('error', fail, { once: true })
 })
 
-const result = await new Promise((resolve, reject) => {
-  const id = 1
-  const timer = setTimeout(() => reject(new Error('CDP timed out')), 300_000)
-  ws.addEventListener('message', (event) => {
-    const msg = JSON.parse(event.data)
-    if (msg.id !== id) return
-    clearTimeout(timer)
-    resolve(msg.result)
+const send = (id, method, params) =>
+  new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('CDP timed out')), 300_000)
+    const onMessage = (event) => {
+      const msg = JSON.parse(event.data)
+      if (msg.id !== id) return
+      clearTimeout(timer)
+      ws.removeEventListener('message', onMessage)
+      resolve(msg.result)
+    }
+    ws.addEventListener('message', onMessage)
+    ws.send(JSON.stringify({ id, method, params }))
   })
-  ws.send(
-    JSON.stringify({
-      id,
-      method: 'Runtime.evaluate',
-      params: { expression, awaitPromise: true, returnByValue: true },
-    }),
-  )
-})
+
+let result
+if (keyMode) {
+  const params = { key, code: key, windowsVirtualKeyCode: key === 'Escape' ? 27 : 0 }
+  await send(1, 'Input.dispatchKeyEvent', { type: 'keyDown', ...params })
+  await send(2, 'Input.dispatchKeyEvent', { type: 'keyUp', ...params })
+  result = { result: { value: `sent ${key}` } }
+} else {
+  result = await send(1, 'Runtime.evaluate', {
+    expression,
+    awaitPromise: true,
+    returnByValue: true,
+  })
+}
 
 ws.close()
 if (result.exceptionDetails) {
