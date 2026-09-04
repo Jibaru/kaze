@@ -29,6 +29,7 @@ import { CanvasOptions } from './canvas/CanvasOptions'
 import { Palette } from './palette/Palette'
 import { ScenarioPanel } from './scenario/ScenarioPanel'
 import { Inspector } from './inspector/Inspector'
+import { EdgeInspector } from './inspector/EdgeInspector'
 import { applyPatch } from '@shared/patch'
 import { serialize } from '@shared/adl'
 import { Toast } from './toast/Toast'
@@ -41,6 +42,7 @@ import { LocaleProvider, useLocale } from './i18n/useLocale'
 import {
   DEFAULT_VIEW,
   flowEdgeType,
+  edgeText,
   flipEdges,
   fromFlow,
   GROUP_DEFAULT_SIZE,
@@ -342,9 +344,39 @@ function Canvas() {
     setStatus(t.undone)
   }, [beforeFix, setNodes, setEdges, t])
 
+  const selectedEdges = useMemo(() => edges.filter((e) => e.selected), [edges])
   const selectedEdgeIds = useMemo(
-    () => new Set(edges.filter((e) => e.selected).map((e) => e.id)),
-    [edges],
+    () => new Set(selectedEdges.map((e) => e.id)),
+    [selectedEdges],
+  )
+
+  /**
+   * What a connection says. Both fields are stored on the edge's `data` and the
+   * rendered text is derived from them, so a line carrying a protocol and a
+   * note draws both rather than quietly showing one.
+   */
+  const setEdgeText = useCallback(
+    (ids: string[], patch: { protocol?: string; label?: string }) => {
+      const set = new Set(ids)
+      setEdges((es) =>
+        es.map((e) => {
+          if (!set.has(e.id)) return e
+          const data = { ...e.data, ...patch }
+          return { ...e, data, label: edgeText(data.protocol, data.label) }
+        }),
+      )
+      markDirty()
+    },
+    [setEdges, markDirty],
+  )
+
+  const removeEdges = useCallback(
+    (ids: string[]) => {
+      const set = new Set(ids)
+      setEdges((es) => es.filter((e) => !set.has(e.id)))
+      markDirty()
+    },
+    [setEdges, markDirty],
   )
 
   const flipSelectedEdges = useCallback(() => {
@@ -611,8 +643,13 @@ function Canvas() {
               </button>
             ))}
           </div>
-          {tab === 'inspector' && (
+          {/* A node wins when both are somehow selected: you clicked the node
+              last, and its panel is the bigger one. */}
+          {tab === 'inspector' && (selected || selectedEdges.length === 0) && (
             <Inspector node={selected} onLabel={setLabel} onProps={setProps} onDelete={removeNode} />
+          )}
+          {tab === 'inspector' && !selected && selectedEdges.length > 0 && (
+            <EdgeInspector edges={selectedEdges} onChange={setEdgeText} onDelete={removeEdges} />
           )}
           {tab === 'text' && <DesignText diagram={diagram} onSelect={selectNodes} />}
           {tab === 'review' && (

@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { flipEdges, fromFlow, toFlow, viewOf, type KazeEdge, type KazeNode } from '../src/renderer/src/diagram-model.ts'
+import { edgeText, flipEdges, fromFlow, toFlow, viewOf, type KazeEdge, type KazeNode } from '../src/renderer/src/diagram-model.ts'
 import { getService, SERVICES } from '../src/shared/services.ts'
 import type { Diagram } from '../src/shared/types.ts'
 
@@ -33,9 +33,9 @@ const edges: KazeEdge[] = [
   { id: 'e-n2-n3', source: 'n2', target: 'n3', data: { protocol: 'HTTPS' } },
   { id: 'e-n3-n4', source: 'n3', target: 'n4', data: {} },
   { id: 'e-n4-n5', source: 'n4', target: 'n5', data: { protocol: 'TCP/5432' } },
-  { id: 'e-n4-n6', source: 'n4', target: 'n6', data: { protocol: 'RESP' } },
+  { id: 'e-n4-n6', source: 'n4', target: 'n6', data: { protocol: 'RESP', label: 'solo lectura' } },
   { id: 'e-n4-n7', source: 'n4', target: 'n7', data: {} },
-  { id: 'e-n7-n8', source: 'n7', target: 'n8', data: {} },
+  { id: 'e-n7-n8', source: 'n7', target: 'n8', data: { label: 'batch cada minuto' } },
   { id: 'e-n8-n9', source: 'n8', target: 'n9', data: {} },
   { id: 'e-n8-n10', source: 'n8', target: 'n10', data: {} },
 ]
@@ -63,6 +63,22 @@ check('the sides a connection attaches to are preserved',
 check('an edge with no chosen sides stays that way',
   saved.edges.find((e) => e.id === 'e-n3-n4')?.fromHandle === undefined)
 check('an untyped edge stays untyped', saved.edges.find((e) => e.id === 'e-n3-n4')?.protocol === undefined)
+
+// A connection carries two things you can type, and until the edge inspector
+// existed only one of them survived being saved.
+const noted = saved.edges.find((e) => e.id === 'e-n4-n6')
+check('a note on a connection is saved alongside its protocol',
+  noted?.protocol === 'RESP' && noted?.label === 'solo lectura', JSON.stringify(noted))
+check('a note survives without a protocol',
+  saved.edges.find((e) => e.id === 'e-n7-n8')?.label === 'batch cada minuto')
+check('a connection with neither carries neither',
+  !('label' in saved.edges.find((e) => e.id === 'e-n8-n9')!))
+
+check('the canvas draws both, or the line lies about what you typed',
+  edgeText('RESP', 'solo lectura') === 'RESP · solo lectura', String(edgeText('RESP', 'solo lectura')))
+check('and draws whichever one there is', edgeText(undefined, 'batch') === 'batch' && edgeText('SQL') === 'SQL')
+check('an untyped, unnoted connection stays silent', edgeText(undefined, undefined) === undefined)
+check('whitespace is not a value', edgeText('   ', '  ') === undefined)
 
 // The actual round trip: reload what we saved, save it again, compare.
 const reloaded = toFlow(saved)

@@ -91,6 +91,16 @@ export interface Dict {
   selectNode: string
   selectNodeHint: string
   label: string
+  connection: string
+  connections: (n: number) => string
+  protocol: string
+  protocolPlaceholder: string
+  protocolHint: string
+  edgeLabel: string
+  edgeLabelPlaceholder: string
+  mixedValues: string
+  deleteConnection: string
+  deleteConnections: (n: number) => string
   deleteBoundary: string
   deleteNode: string
   noProps: string
@@ -249,6 +259,16 @@ const es: Dict = {
   selectNode: 'Selecciona un nodo para configurarlo.',
   selectNodeHint: 'Lo que dejas en blanco es lo que se señala: las omisiones son hallazgos.',
   label: 'Etiqueta',
+  connection: 'Conexión',
+  connections: (n) => `${n} conexiones`,
+  protocol: 'Protocolo',
+  protocolPlaceholder: 'HTTPS, gRPC, SQL…',
+  protocolHint: 'Una conexión sin protocolo aparece como omisión en el texto del diseño.',
+  edgeLabel: 'Nota',
+  edgeLabelPlaceholder: 'lo que viaja por aquí',
+  mixedValues: '— varios —',
+  deleteConnection: 'Eliminar conexión',
+  deleteConnections: (n) => `Eliminar ${n} conexiones`,
   deleteBoundary: 'Eliminar límite',
   deleteNode: 'Eliminar nodo',
   noProps: 'Este servicio no tiene propiedades configurables.',
@@ -517,6 +537,16 @@ const en: Dict = {
   selectNode: 'Select a node to configure it.',
   selectNodeHint: 'What you leave blank is what gets flagged — omissions are findings.',
   label: 'Label',
+  connection: 'Connection',
+  connections: (n) => `${n} connections`,
+  protocol: 'Protocol',
+  protocolPlaceholder: 'HTTPS, gRPC, SQL…',
+  protocolHint: 'A connection with no protocol shows up as a gap in the design text.',
+  edgeLabel: 'Note',
+  edgeLabelPlaceholder: 'what travels along it',
+  mixedValues: '— mixed —',
+  deleteConnection: 'Delete connection',
+  deleteConnections: (n) => `Delete ${n} connections`,
   deleteBoundary: 'Delete boundary',
   deleteNode: 'Delete node',
   noProps: 'No configurable properties for this service.',

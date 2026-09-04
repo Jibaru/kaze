@@ -11,7 +11,24 @@ export type ServiceNodeData = { serviceId: string; label: string; props: NodePro
 export type GroupNodeData = { kind: GroupKind; label: string }
 
 export type KazeNode = Node<ServiceNodeData, 'service'> | Node<GroupNodeData, 'group'>
-export type KazeEdge = Edge<{ protocol?: string }>
+export type KazeEdge = Edge<{ protocol?: string; label?: string }>
+
+/**
+ * What a connection says on the canvas.
+ *
+ * Two fields rather than one because they are read by different readers.
+ * `protocol` is the one the app has an opinion about: an edge without one
+ * raises the `untyped_edge` gap, and it is serialized as a key the reviewer can
+ * argue with. `label` is yours — "cache miss", "async", "solo lectura" — and
+ * the reviewer only sees it as prose.
+ *
+ * They are shown together because a connection carrying both and drawing only
+ * one is a connection that lies about what you typed.
+ */
+export const edgeText = (protocol?: string, label?: string): string | undefined => {
+  const parts = [protocol?.trim(), label?.trim()].filter(Boolean)
+  return parts.length ? parts.join(' · ') : undefined
+}
 
 export const GROUP_DEFAULT_SIZE = { width: 420, height: 300 }
 
@@ -59,8 +76,11 @@ export function toFlow(diagram: Diagram): { nodes: KazeNode[]; edges: KazeEdge[]
     source: e.from,
     target: e.to,
     type,
-    label: e.protocol ?? e.label,
-    data: e.protocol ? { protocol: e.protocol } : {},
+    label: edgeText(e.protocol, e.label),
+    data: {
+      ...(e.protocol ? { protocol: e.protocol } : {}),
+      ...(e.label ? { label: e.label } : {}),
+    },
     ...(e.fromHandle ? { sourceHandle: e.fromHandle } : {}),
     ...(e.toHandle ? { targetHandle: e.toHandle } : {}),
   }))
@@ -114,6 +134,7 @@ export function fromFlow(
       from: e.source,
       to: e.target,
       ...(e.data?.protocol ? { protocol: e.data.protocol } : {}),
+      ...(e.data?.label ? { label: e.data.label } : {}),
       ...(e.sourceHandle ? { fromHandle: e.sourceHandle } : {}),
       ...(e.targetHandle ? { toHandle: e.targetHandle } : {}),
     })),
