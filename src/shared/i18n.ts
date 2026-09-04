@@ -61,6 +61,7 @@ export interface Dict {
   noScenarios: string
   scenarioLabel: string
   newScenario: string
+  scenarioActions: string
   newScenarioCancel: string
   topicLabel: string
   topicPlaceholder: string
@@ -210,6 +211,7 @@ const es: Dict = {
   noScenarios: 'No hay escenarios en el espacio de trabajo.',
   scenarioLabel: 'Escenario de práctica',
   newScenario: 'Nuevo escenario',
+  scenarioActions: 'Acciones del escenario',
   newScenarioCancel: 'Cancelar',
   topicLabel: 'Tema',
   topicPlaceholder: 'p. ej. el feed de una red social, o reservas de vuelos con inventario limitado',
@@ -470,6 +472,7 @@ const en: Dict = {
   noScenarios: 'No scenarios found in the workspace.',
   scenarioLabel: 'Practice scenario',
   newScenario: 'New scenario',
+  scenarioActions: 'Scenario actions',
   newScenarioCancel: 'Cancel',
   topicLabel: 'Topic',
   topicPlaceholder: 'e.g. a social feed, or flight booking with limited inventory',

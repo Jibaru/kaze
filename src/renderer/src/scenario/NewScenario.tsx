@@ -17,19 +17,19 @@ import { useT } from '../i18n/useLocale'
  * platform does not do.
  */
 export function NewScenario({
+  open,
+  onOpenChange,
   onCreated,
-  onNewSession,
 }: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
   onCreated: (id: string) => void
-  /** Archive this attempt and start clean. */
-  onNewSession: () => void
 }) {
   const t = useT()
   const dialog = useRef<HTMLDialogElement>(null)
   const topicField = useRef<HTMLTextAreaElement>(null)
   const titleId = useId()
 
-  const [open, setOpen] = useState(false)
   const [topic, setTopic] = useState('')
   const [difficulty, setDifficulty] = useState(2)
   const [busy, setBusy] = useState(false)
@@ -54,7 +54,7 @@ export function NewScenario({
     if (busy) void window.kaze.cancelScenario()
     setBusy(false)
     setError(null)
-    setOpen(false)
+    onOpenChange(false)
   }
 
   const create = async () => {
@@ -68,7 +68,7 @@ export function NewScenario({
         return
       }
       setTopic('')
-      setOpen(false)
+      onOpenChange(false)
       onCreated(result.id)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -78,81 +78,67 @@ export function NewScenario({
   }
 
   return (
-    <>
-      <div className="scenario__actions">
-        <button className="btn btn--ghost btn--small" onClick={() => setOpen(true)}>
-          + {t.newScenario}
-        </button>
-        <button className="linkbtn" onClick={() => void window.kaze.revealScenarios()}>
-          {t.openScenarioFolder}
-        </button>
-        <button className="linkbtn" onClick={onNewSession}>
-          {t.newSession}
-        </button>
-      </div>
+  <dialog
+      ref={dialog}
+      className="modal"
+      aria-labelledby={titleId}
+      // Escape fires `close` directly; this keeps React's state in step.
+      onClose={() => onOpenChange(false)}
+      onCancel={(e) => {
+        if (busy) e.preventDefault()
+      }}
+      onClick={(e) => {
+        // A click that lands on the dialog element itself is a click on the
+        // backdrop: the content sits in a child.
+        if (e.target === dialog.current && !busy) close()
+      }}
+    >
+      <form method="dialog" className="modal__panel" onSubmit={(e) => e.preventDefault()}>
+        <h2 className="modal__title" id={titleId}>
+          {t.newScenario}
+        </h2>
+        <p className="modal__hint">{t.rubricStaysHidden}</p>
 
-      <dialog
-        ref={dialog}
-        className="modal"
-        aria-labelledby={titleId}
-        // Escape fires `close` directly; this keeps React's state in step.
-        onClose={() => setOpen(false)}
-        onCancel={(e) => {
-          if (busy) e.preventDefault()
-        }}
-        onClick={(e) => {
-          // A click that lands on the dialog element itself is a click on the
-          // backdrop: the content sits in a child.
-          if (e.target === dialog.current && !busy) close()
-        }}
-      >
-        <form method="dialog" className="modal__panel" onSubmit={(e) => e.preventDefault()}>
-          <h2 className="modal__title" id={titleId}>
-            {t.newScenario}
-          </h2>
-          <p className="modal__hint">{t.rubricStaysHidden}</p>
+        <label className="field">
+          <span>{t.topicLabel}</span>
+          <textarea
+            ref={topicField}
+            className="modal__topic"
+            rows={3}
+            value={topic}
+            disabled={busy}
+            placeholder={t.topicPlaceholder}
+            onChange={(e) => setTopic(e.target.value)}
+            onKeyDown={(e) => {
+              // Enter alone would fight a multi-line topic.
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) void create()
+            }}
+          />
+        </label>
 
-          <label className="field">
-            <span>{t.topicLabel}</span>
-            <textarea
-              ref={topicField}
-              className="modal__topic"
-              rows={3}
-              value={topic}
-              disabled={busy}
-              placeholder={t.topicPlaceholder}
-              onChange={(e) => setTopic(e.target.value)}
-              onKeyDown={(e) => {
-                // Enter alone would fight a multi-line topic.
-                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) void create()
-              }}
-            />
-          </label>
+        <label className="field">
+          <span>{t.difficulty}</span>
+          <select value={difficulty} disabled={busy} onChange={(e) => setDifficulty(Number(e.target.value))}>
+            {[1, 2, 3].map((n) => (
+              <option key={n} value={n}>
+                {t.difficultyLevel(n)}
+              </option>
+            ))}
+          </select>
+        </label>
 
-          <label className="field">
-            <span>{t.difficulty}</span>
-            <select value={difficulty} disabled={busy} onChange={(e) => setDifficulty(Number(e.target.value))}>
-              {[1, 2, 3].map((n) => (
-                <option key={n} value={n}>
-                  {t.difficultyLevel(n)}
-                </option>
-              ))}
-            </select>
-          </label>
+        {error && <p className="modal__error">{error}</p>}
 
-          {error && <p className="modal__error">{error}</p>}
-
-          <div className="modal__actions">
-            <button type="button" className="btn btn--ghost" onClick={close}>
-              {t.newScenarioCancel}
-            </button>
-            <button type="button" className="btn" onClick={() => void create()} disabled={busy || !topic.trim()}>
-              {busy && <span className="spinner" aria-hidden />}
-              {busy ? t.creatingScenario : t.createScenario}
-            </button>
-          </div>
-        </form>
-      </dialog>
-    </>
+        <div className="modal__actions">
+          <button type="button" className="btn btn--ghost" onClick={close}>
+            {t.newScenarioCancel}
+          </button>
+          <button type="button" className="btn" onClick={() => void create()} disabled={busy || !topic.trim()}>
+            {busy && <span className="spinner" aria-hidden />}
+            {busy ? t.creatingScenario : t.createScenario}
+          </button>
+        </div>
+      </form>
+  </dialog>
   )
 }
