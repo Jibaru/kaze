@@ -37,6 +37,7 @@ export interface Dict {
   edgeStyleName: Record<string, string>
   background: string
   backgroundName: Record<string, string>
+  cycleTo: (name: string) => string
   noScenarios: string
   scenarioLabel: string
   newScenario: string
@@ -164,6 +165,7 @@ const es: Dict = {
   },
   background: 'Fondo',
   backgroundName: { dots: 'Puntos', grid: 'Cuadrícula', none: 'Liso' },
+  cycleTo: (name) => `pulsa para cambiar a ${name.toLowerCase()}`,
   noScenarios: 'No hay escenarios en el espacio de trabajo.',
   scenarioLabel: 'Escenario de práctica',
   newScenario: 'Nuevo escenario',
@@ -402,6 +404,7 @@ const en: Dict = {
   },
   background: 'Background',
   backgroundName: { dots: 'Dots', grid: 'Grid', none: 'Plain' },
+  cycleTo: (name) => `click for ${name.toLowerCase()}`,
   noScenarios: 'No scenarios found in the workspace.',
   scenarioLabel: 'Practice scenario',
   newScenario: 'New scenario',

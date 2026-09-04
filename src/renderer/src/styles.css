@@ -1139,34 +1139,39 @@ button, input, select { font-family: inherit; font-size: inherit; color: inherit
   from { opacity: 0; transform: translateY(6px); }
 }
 
-/* ── canvas options ─────────────────────────────────────────────────────
-   View settings live on the canvas they affect, not in a rail: they are not
-   part of the design and the reviewer never sees them. */
-.canvasopts {
+/* ── canvas toolbar ─────────────────────────────────────────────────────
+   View settings live on the canvas they affect. Each button cycles its
+   setting, and its icon draws the thing it selects, so the toolbar needs no
+   legend and the click that changes the style changes the picture. */
+.canvasbar {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius);
+  border-radius: var(--radius-pill);
   box-shadow: var(--elev-1);
-  padding: 10px 12px;
+  padding: 4px;
   margin: 12px;
 }
-.canvasopts__row { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
-.canvasopts__row > span {
-  font-size: var(--text-xs);
-  line-height: var(--lh-xs);
-  color: var(--text-secondary);
-  white-space: nowrap;
+
+.canvasbar__btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  color: var(--grey-800);
+  cursor: pointer;
+  transition-property: background-color, color, scale;
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
-.canvasopts select {
-  min-height: 32px;
-  min-width: 168px;
-  background: var(--surface);
-  border: 1px solid var(--border-control);
-  border-radius: var(--radius-sm);
-  padding: 0 8px;
-  font-size: var(--text-sm);
+.canvasbar__btn:hover { background: var(--surface-hover); color: var(--text); }
+.canvasbar__btn:active { scale: 0.94; }
+.canvasbar__btn svg { width: 22px; height: 22px; display: block; }
+
+@media (prefers-reduced-motion: reduce) {
+  .canvasbar__btn:active { scale: 1; }
 }
-.canvasopts select:focus { outline: none; border-color: var(--primary); }
