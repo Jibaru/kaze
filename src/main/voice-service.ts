@@ -78,8 +78,12 @@ export class VoiceService {
    * is not something you replay, and waiting for a file before playing it is
    * exactly the wait this exists to remove.
    */
-  async speakStreaming(text: string, onChunk: (chunk: Uint8Array) => void): Promise<void> {
-    await streamSpeech(await this.require(), text, onChunk)
+  async speakStreaming(
+    text: string,
+    speed: number,
+    onChunk: (chunk: Uint8Array) => void,
+  ): Promise<void> {
+    await streamSpeech(await this.require(), text, speed, onChunk)
   }
 
   static audioPath(attemptDir: string, revision: number): string {

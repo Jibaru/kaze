@@ -18,6 +18,7 @@ import {
   spokenHalfComplete,
 } from '../src/main/conversation.ts'
 import { applyPatch, parsePatch } from '../src/shared/patch.ts'
+import { clampSpeed, SPEECH_RATES } from '../src/shared/openai-audio.ts'
 import type { Diagram } from '../src/shared/types.ts'
 
 const checks: Array<[string, boolean, string?]> = []
@@ -139,6 +140,19 @@ try {
     [...CONVERSATION_SYSTEM.matchAll(/"op":\s*"([a-z_]+)"/g)].every(
       (m) => parsePatch([{ op: m[1]! }], { allowRemoveNode: true }).length === 1,
     ))
+
+  // ── how fast it reads ──────────────────────────────────────────────────
+  // Asked of the synthesizer rather than done to the audio afterwards: Web
+  // Audio has no time-stretching, so speeding a buffer up shifts the pitch.
+  check('every offered speed is one the API accepts',
+    SPEECH_RATES.every((r) => clampSpeed(r) === r), SPEECH_RATES.join(', '))
+  check('the offered speeds start at normal and only go up',
+    SPEECH_RATES[0] === 1 && SPEECH_RATES.every((r, i, a) => i === 0 || r > a[i - 1]!))
+  check('a speed outside the API range is pulled back rather than sent',
+    clampSpeed(9) === 4 && clampSpeed(0) === 0.25)
+  check('anything that is not a finite speed reads at normal speed',
+    clampSpeed(Number.NaN) === 1 && clampSpeed(Number.POSITIVE_INFINITY) === 1,
+    `${clampSpeed(Number.NaN)}, ${clampSpeed(Number.POSITIVE_INFINITY)}`)
 
   for (const [name, pass, detail] of checks) {
     console.log(`${pass ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`)

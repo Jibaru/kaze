@@ -7,8 +7,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
  * `Audio` element rather than a streaming pipeline: after waiting 90 seconds for
  * a review, a second of synthesis is noise, and one file means replay is free.
  */
-export function useSpokenSummary() {
+export function useSpokenSummary(rate = 1) {
   const audio = useRef<HTMLAudioElement | null>(null)
+  /** Read where it is used rather than in a dependency: changing the speed
+   *  must not tear down and reload the audio that is playing. */
+  const speed = useRef(rate)
+  speed.current = rate
   const url = useRef<string | null>(null)
   const [playing, setPlaying] = useState(false)
   const [available, setAvailable] = useState(false)
@@ -23,6 +27,7 @@ export function useSpokenSummary() {
 
   const play = useCallback(() => {
     if (!audio.current) return
+    audio.current.playbackRate = speed.current
     audio.current.currentTime = 0
     void audio.current.play()
     setPlaying(true)
@@ -45,6 +50,11 @@ export function useSpokenSummary() {
       const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
       url.current = URL.createObjectURL(new Blob([bytes], { type: 'audio/mpeg' }))
       const element = new Audio(url.current)
+      // Time-stretched by the browser, so the voice keeps its pitch. Conversation
+      // mode cannot do this — see `useSpeechRate` — and asks the synthesizer
+      // to read faster instead.
+      element.preservesPitch = true
+      element.playbackRate = speed.current
       element.onended = () => setPlaying(false)
       audio.current = element
       setAvailable(true)

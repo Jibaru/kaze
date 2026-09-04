@@ -230,9 +230,14 @@ export interface KazeApi {
   /** Operations that answer one finding. The renderer validates and applies them. */
   proposeFix(claim: string, fix: string): Promise<import('./patch').PatchOp[]>
   /** Enter conversation mode: frames the case, draws nothing. */
-  openChat(diagram: Diagram): Promise<ChatTurn>
-  /** One spoken exchange. `refused` is what the app rejected last turn. */
-  sayToChat(said: string, refused: string[]): Promise<ChatTurn>
+  openChat(diagram: Diagram, speed: number): Promise<ChatTurn>
+  /**
+   * One spoken exchange. `refused` is what the app rejected last turn, `speed`
+   * how fast to read the reply — asked of the synthesizer rather than done to
+   * the audio afterwards, so the voice keeps its pitch and there is less of it
+   * to wait for.
+   */
+  sayToChat(said: string, refused: string[], speed: number): Promise<ChatTurn>
   /** Streamed speech for conversation mode. Returns the unsubscribe. */
   onChatAudio(handler: (audio: ChatAudio) => void): () => void
   /** Leaving the mode: lets go of the process it was holding open. */

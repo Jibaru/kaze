@@ -1669,3 +1669,10 @@ button, input, select { font-family: inherit; font-size: inherit; color: inherit
   max-width: 168px;
 }
 .chatstate--opening { color: var(--grey-700); }
+
+/* The speed control. Its label is its state, so it needs a fixed width or the
+   bar around it shuffles every time you press it. */
+.speedbtn {
+  min-width: 62px;
+  font-variant-numeric: tabular-nums;
+}

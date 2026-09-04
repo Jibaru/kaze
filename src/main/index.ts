@@ -441,11 +441,11 @@ let chatAudioSeq = 0
  * Voice stays an enhancement: no key, or a network failure, and the turn still
  * lands with its text and its operations.
  */
-async function speakInto(text: string, seq: number): Promise<void> {
+async function speakInto(text: string, seq: number, speed: number): Promise<void> {
   if (!text) return
   try {
     if (!(await voice.hasKey())) return
-    await voice.speakStreaming(text, (chunk) => {
+    await voice.speakStreaming(text, speed, (chunk) => {
       win?.webContents.send('chat:audio', { seq, chunk: Buffer.from(chunk).toString('base64') })
     })
   } catch (err) {
@@ -455,12 +455,12 @@ async function speakInto(text: string, seq: number): Promise<void> {
   }
 }
 
-async function chatTurn(prompt: string, fresh: boolean): Promise<ChatTurn> {
+async function chatTurn(prompt: string, fresh: boolean, speed: number): Promise<ChatTurn> {
   if (fresh) live.close()
   const seq = ++chatAudioSeq
   let spoken: Promise<void> | null = null
   const speak = (text: string) => {
-    if (!spoken && text) spoken = speakInto(text, seq)
+    if (!spoken && text) spoken = speakInto(text, seq, speed)
   }
 
   emit({ kind: 'turn-start', intent: 'ask' })
@@ -491,7 +491,7 @@ async function chatTurn(prompt: string, fresh: boolean): Promise<ChatTurn> {
   }
 }
 
-ipcMain.handle('chat:open', async (_e, diagram: Diagram): Promise<ChatTurn> => {
+ipcMain.handle('chat:open', async (_e, diagram: Diagram, speed = 1): Promise<ChatTurn> => {
   await store.saveDiagram(diagram, ATTEMPT)
   const locale = currentLocale()
   return chatTurn(
@@ -501,11 +501,12 @@ ipcMain.handle('chat:open', async (_e, diagram: Diagram): Promise<ChatTurn> => {
       locale,
     }),
     true,
+    speed,
   )
 })
 
-ipcMain.handle('chat:say', (_e, said: string, refused: string[] = []): Promise<ChatTurn> =>
-  chatTurn(conversationTurn(said, refused), false),
+ipcMain.handle('chat:say', (_e, said: string, refused: string[] = [], speed = 1): Promise<ChatTurn> =>
+  chatTurn(conversationTurn(said, refused), false, speed),
 )
 
 // Leaving the mode lets the process go. Holding a CLI open for a conversation

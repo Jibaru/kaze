@@ -146,6 +146,8 @@ export interface Dict {
   chatMuteHint: string
   chatInterrupt: string
   chatExit: string
+  speechRateHint: string
+  speechRateNow: (label: string) => string
   chatMeterHint: string
   chatDevice: string
   chatNoSignal: string
@@ -337,6 +339,9 @@ const es: Dict = {
   chatMuteHint: 'Apagar o encender el micrófono. Mientras habla, púlsalo para interrumpir.',
   chatInterrupt: 'Interrumpir y hablar',
   chatExit: 'Salir',
+  speechRateHint:
+    'Velocidad de la voz. Se la pedimos a OpenAI al generar el audio, así que mantiene el tono y además llega antes.',
+  speechRateNow: (label) => `Velocidad de la voz: ${label}. Púlsalo para cambiarla.`,
   chatMeterHint: 'Nivel del micrófono. A partir de la mitad empieza a escucharte.',
   chatDevice: 'Micrófono',
   chatNoSignal: 'No llega señal de ese micrófono. Elige otro en la lista de al lado.',
@@ -640,6 +645,9 @@ const en: Dict = {
   chatMuteHint: 'Turn the microphone off or on. While it is speaking, press to interrupt.',
   chatInterrupt: 'Interrupt and speak',
   chatExit: 'Leave',
+  speechRateHint:
+    'How fast it speaks. Asked of OpenAI when the audio is made, so the voice keeps its pitch and arrives sooner.',
+  speechRateNow: (label) => `Speech speed: ${label}. Press to change it.`,
   chatMeterHint: 'Microphone level. From halfway up it starts listening.',
   chatDevice: 'Microphone',
   chatNoSignal: 'Nothing is arriving from that microphone. Pick another one beside this.',

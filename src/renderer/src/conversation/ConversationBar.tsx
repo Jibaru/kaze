@@ -31,6 +31,8 @@ export function ConversationBar({
   inputs,
   deviceId,
   onDevice,
+  rateLabel,
+  onCycleRate,
   onToggleMute,
   onInterrupt,
   onExit,
@@ -58,6 +60,10 @@ export function ConversationBar({
   inputs: AudioInput[]
   deviceId: string
   onDevice: (id: string) => void
+  /** How fast it reads, e.g. "1.5×". Asked of the synthesizer, not of the
+   *  audio afterwards — see `useSpeechRate`. */
+  rateLabel: string
+  onCycleRate: () => void
   onToggleMute: () => void
   /** Stop it talking and start listening again. */
   onInterrupt: () => void
@@ -155,6 +161,19 @@ export function ConversationBar({
             />
           ))}
         </span>
+
+        {/* Cycles, like the canvas toolbar: one control, five speeds, and the
+            current one is the label. It applies to the next thing it says —
+            the sentence you are hearing was already synthesized. */}
+        <button
+          className="btn btn--ghost speedbtn"
+          onClick={onCycleRate}
+          onKeyDown={holdKey}
+          title={t.speechRateHint}
+          aria-label={t.speechRateNow(rateLabel)}
+        >
+          {rateLabel}
+        </button>
 
         <button
           className={`btn btn--ghost chatbar__mute${muted ? ' chatbar__mute--on' : ''}`}

@@ -25,8 +25,9 @@ const api: KazeApi = {
   cancelTurn: () => ipcRenderer.invoke('review:cancel'),
   newSession: () => ipcRenderer.invoke('attempt:new'),
   proposeFix: (claim: string, fix: string) => ipcRenderer.invoke('review:fix', claim, fix),
-  openChat: (diagram: Diagram) => ipcRenderer.invoke('chat:open', diagram),
-  sayToChat: (said: string, refused: string[]) => ipcRenderer.invoke('chat:say', said, refused),
+  openChat: (diagram: Diagram, speed: number) => ipcRenderer.invoke('chat:open', diagram, speed),
+  sayToChat: (said: string, refused: string[], speed: number) =>
+    ipcRenderer.invoke('chat:say', said, refused, speed),
   onChatAudio: (handler: (audio: ChatAudio) => void) => {
     const listener = (_e: IpcRendererEvent, audio: ChatAudio) => handler(audio)
     ipcRenderer.on('chat:audio', listener)

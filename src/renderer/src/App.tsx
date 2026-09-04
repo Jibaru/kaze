@@ -34,6 +34,7 @@ import { ConversationBar, type ChatState } from './conversation/ConversationBar'
 import { useVoiceLoop } from './voice/useVoiceLoop'
 import { useStreamedSpeech } from './voice/useStreamedSpeech'
 import { useAudioInputs } from './voice/useAudioInputs'
+import { useSpeechRate } from './voice/useSpeechRate'
 import { applyPatch, type PatchOp } from '@shared/patch'
 import { serialize } from '@shared/adl'
 import { Toast } from './toast/Toast'
@@ -74,6 +75,7 @@ function Canvas() {
   const [nodes, setNodes, onNodesChange] = useNodesState<KazeNode>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<KazeEdge>([])
   const [status, setStatus] = useState('')
+  const speechRate = useSpeechRate()
   const [tab, setTab] = useState<'inspector' | 'text' | 'review'>('inspector')
   const [transcript, setTranscript] = useState('')
   const [outcome, setOutcome] = useState<ReviewOutcome | null>(null)
@@ -252,7 +254,7 @@ function Canvas() {
     setStatus(t.revisionWritten(result.revision, changed))
   }, [diagram, t])
 
-  const speech = useSpokenSummary()
+  const speech = useSpokenSummary(speechRate.rate)
 
   /** Reload the bank after authoring, and start practising the new brief. */
   const adoptScenario = useCallback(
@@ -585,14 +587,14 @@ function Canvas() {
       const refused = chatRef.current?.refused ?? []
       setChat((c) => (c ? { ...c, busy: true } : c))
       window.kaze
-        .sayToChat(said, refused)
+        .sayToChat(said, refused, speechRate.rate)
         .then(landChatTurn)
         .catch((err: Error) => {
           setStatus(err.message)
           setChat((c) => (c ? { ...c, busy: false } : c))
         })
     },
-    [landChatTurn],
+    [landChatTurn, speechRate.rate],
   )
 
   // Listed only while the mode is open: enumerating devices is cheap, and the
@@ -645,12 +647,12 @@ function Canvas() {
     setChatNote('')
     setChat({ say: '', busy: true, refused: [] })
     try {
-      landChatTurn(await window.kaze.openChat(diagramRef.current))
+      landChatTurn(await window.kaze.openChat(diagramRef.current, speechRate.rate))
     } catch (err) {
       setStatus(err instanceof Error ? err.message : String(err))
       setChat(null)
     }
-  }, [hasVoiceKey, landChatTurn, t])
+  }, [hasVoiceKey, landChatTurn, speechRate.rate, t])
 
   const exitChat = useCallback(() => {
     chatSpeech.stop()
@@ -891,6 +893,8 @@ function Canvas() {
           inputs={mics.inputs}
           deviceId={mics.deviceId}
           onDevice={mics.choose}
+          rateLabel={speechRate.label}
+          onCycleRate={speechRate.cycle}
           onToggleMute={() => setMuted((m) => !m)}
           onInterrupt={() => chatSpeech.stop()}
           onExit={exitChat}
@@ -938,6 +942,14 @@ function Canvas() {
             {speech.playing ? `■ ${t.stopPlayback}` : `▶ ${t.replay}`}
           </button>
         )}
+        <button
+          className="btn btn--ghost speedbtn"
+          onClick={speechRate.cycle}
+          title={t.speechRateHint}
+          aria-label={t.speechRateNow(speechRate.label)}
+        >
+          {speechRate.label}
+        </button>
         {streaming && (
           <button className="btn btn--ghost" onClick={() => void window.kaze.cancelTurn()}>
             {t.stop}

@@ -21,6 +21,20 @@ export const FAST_SPEECH_MODEL = 'tts-1'
 
 /** Raw PCM from the API: 24 kHz, signed 16-bit little-endian, mono. */
 export const PCM_SAMPLE_RATE = 24_000
+
+/**
+ * How fast it talks.
+ *
+ * Asked of the API rather than done with `playbackRate`, because the two are
+ * not the same thing: Web Audio resampling shifts the pitch, and a reviewer who
+ * sounds like a chipmunk at 1.5x is not a faster reviewer. The API reads
+ * faster instead — same voice — and there is less audio to wait for, so the
+ * setting cuts the pause before the first word as well as the length of it.
+ */
+export const SPEECH_RATES = [1, 1.25, 1.5, 1.75, 2] as const
+/** The API's own limits. Anything outside them is a 400, not a slower voice. */
+export const clampSpeed = (speed: number): number =>
+  Number.isFinite(speed) ? Math.min(4, Math.max(0.25, speed)) : 1
 export const VOICE = 'alloy'
 
 /**
@@ -93,6 +107,7 @@ async function speechResponse(
   text: string,
   model: string,
   format: 'mp3' | 'pcm',
+  speed = 1,
 ): Promise<Response> {
   const response = await fetch('https://api.openai.com/v1/audio/speech', {
     method: 'POST',
@@ -102,6 +117,7 @@ async function speechResponse(
       voice: VOICE,
       input: text,
       response_format: format,
+      speed: clampSpeed(speed),
       // Only the newer model takes them, and it silently ignores the field
       // rather than failing, which is why this is not conditional.
       instructions: SPEECH_INSTRUCTIONS,
@@ -131,9 +147,10 @@ export async function synthesizeSpeech(apiKey: string, text: string): Promise<Ui
 export async function streamSpeech(
   apiKey: string,
   text: string,
+  speed: number,
   onChunk: (chunk: Uint8Array) => void,
 ): Promise<void> {
-  const response = await speechResponse(apiKey, text, FAST_SPEECH_MODEL, 'pcm')
+  const response = await speechResponse(apiKey, text, FAST_SPEECH_MODEL, 'pcm', speed)
   const body = response.body
   if (!body) throw new Error('speech stream had no body')
   const reader = body.getReader()
