@@ -838,3 +838,69 @@ button, input, select { font-family: inherit; font-size: inherit; color: inherit
 }
 .langselect:hover { background: var(--surface-hover); color: var(--text); }
 .langselect:focus { outline: none; border-color: var(--primary); }
+
+/* ── scrollbars ─────────────────────────────────────────────────────────
+   Chromium's default light scrollbar is a wide grey slab that fights the
+   surfaces it sits on. These are thin, rounded and inset, in the same
+   neutral ramp as everything else.
+
+   The thumb is #80868b, which measures 3.68:1 on white, 3.49:1 on the sunken
+   surface and 3.31:1 on the code block. That is deliberate rather than
+   decorative: a scrollbar is often the only thing telling you the content
+   continues, so it has to clear the 3:1 non-text minimum on every surface it
+   appears over. #dadce0 would have matched the surrounding chrome better and
+   measured 1.37:1, which is a cue you cannot see. */
+
+/* Note: `scrollbar-width` / `scrollbar-color` are deliberately absent. Setting
+   either one makes Chromium ignore every ::-webkit-scrollbar rule below, so the
+   rounded inset thumb silently reverts to a plain thin bar. This is an Electron
+   app — one engine — so the pseudo-elements are the better half of that trade. */
+
+:root {
+  --scrollbar-thumb: #80868b;
+  --scrollbar-thumb-hover: var(--grey-700);
+}
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* The transparent border plus padding-box clip is what insets the thumb, so it
+   reads as floating in the gutter instead of filling it. */
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: var(--radius-pill);
+  min-height: 40px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:active {
+  background: var(--text);
+  background-clip: padding-box;
+}
+
+/* Where both axes scroll, the square between them should not be a grey hole. */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* The code block scrolls sideways and is the one place a horizontal bar shows;
+   keep it out of the text's way. */
+.designtext__code::-webkit-scrollbar {
+  height: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::-webkit-scrollbar-thumb {
+    transition: none;
+  }
+}
