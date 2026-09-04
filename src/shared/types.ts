@@ -83,12 +83,26 @@ export interface DiagramEdge {
   label?: string
 }
 
+/** How an edge is drawn. Presentation only — see `Diagram`. */
+export type EdgeStyle = 'bezier' | 'straight' | 'step' | 'smoothstep'
+
+/** What the canvas is drawn on. */
+export type BackgroundStyle = 'dots' | 'grid' | 'none'
+
 export interface Diagram {
   version: 1
   scenarioId: string
   nodes: DiagramNode[]
   groups: DiagramGroup[]
   edges: DiagramEdge[]
+  /**
+   * How the canvas looks. Saved with the diagram so it survives a restart, and
+   * deliberately absent from `kaze-adl`: whether a connection is drawn curved
+   * or square-cornered is not something a reviewer can have an opinion about,
+   * and putting it in the serialized design would invite one.
+   */
+  edgeStyle?: EdgeStyle
+  background?: BackgroundStyle
 }
 
 export const emptyDiagram = (scenarioId = 'scratch'): Diagram => ({

@@ -22,6 +22,7 @@ import { emptyDiagram } from '@shared/types'
 import { getService, type ServiceSpec } from '@shared/services'
 import { ServiceNode } from './canvas/ServiceNode'
 import { GroupNode } from './canvas/GroupNode'
+import { CanvasOptions } from './canvas/CanvasOptions'
 import { Palette } from './palette/Palette'
 import { ScenarioPanel } from './scenario/ScenarioPanel'
 import { Inspector } from './inspector/Inspector'
@@ -32,13 +33,17 @@ import { useSpokenSummary } from './voice/useSpokenSummary'
 import { AskPopover } from './voice/AskPopover'
 import { LocaleProvider, useLocale } from './i18n/useLocale'
 import {
+  DEFAULT_VIEW,
+  flowEdgeType,
   fromFlow,
   GROUP_DEFAULT_SIZE,
   nextGroupId,
   nextNodeId,
   toFlow,
+  viewOf,
   type KazeEdge,
   type KazeNode,
+  type ViewOptions,
 } from './diagram-model'
 
 const nodeTypes: NodeTypes = { service: ServiceNode as never, group: GroupNode as never }
@@ -60,6 +65,7 @@ function Canvas() {
   const [streaming, setStreaming] = useState(false)
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [scenarioId, setScenarioId] = useState('')
+  const [view, setView] = useState<ViewOptions>(DEFAULT_VIEW)
   const [hasVoiceKey, setHasVoiceKey] = useState(false)
   const [keyDraft, setKeyDraft] = useState('')
   const [dirty, setDirty] = useState(false)
@@ -71,7 +77,14 @@ function Canvas() {
   const selected = useMemo(() => nodes.find((n) => n.selected) ?? null, [nodes])
   // The save format is also the review format, so it is derived live rather
   // than only on save — the text panel must never lag the canvas.
-  const diagram = useMemo(() => fromFlow(nodes, edges, scenarioId), [nodes, edges, scenarioId])
+  const diagram = useMemo(() => fromFlow(nodes, edges, scenarioId, view), [nodes, edges, scenarioId, view])
+  // `defaultEdgeOptions` only reaches edges created after the change, so the
+  // type is applied at render time. Changing the setting should redraw the
+  // diagram you already have, not just the next connection you make.
+  const drawnEdges = useMemo(
+    () => edges.map((e) => ({ ...e, type: flowEdgeType(view.edgeStyle) })),
+    [edges, view.edgeStyle],
+  )
   const serviceCount = nodes.filter((n) => n.type === 'service').length
 
   const markDirty = useCallback(() => setDirty(true), [])
@@ -210,6 +223,7 @@ function Canvas() {
       // against a file that isn't there.
       const known = found.some((s) => s.id === restored.scenarioId)
       setScenarioId(known ? restored.scenarioId : (found[0]?.id ?? ''))
+      setView(viewOf(restored))
     })()
   }, [setNodes, setEdges])
 
@@ -345,7 +359,7 @@ function Canvas() {
       <main className="canvas" ref={wrapper}>
         <ReactFlow
           nodes={nodes}
-          edges={edges}
+          edges={drawnEdges}
           onNodesChange={(c) => {
             onNodesChange(c)
             if (c.some((ch) => ch.type !== 'select' && ch.type !== 'dimensions')) markDirty()
@@ -368,9 +382,20 @@ function Canvas() {
             addService(spec, screenToFlowPosition({ x: e.clientX, y: e.clientY }))
           }}
           proOptions={{ hideAttribution: false }}
-          defaultEdgeOptions={{ animated: false }}
+          defaultEdgeOptions={{ animated: false, type: flowEdgeType(view.edgeStyle) }}
         >
-          <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} color="#dadce0" />
+          {view.background === 'dots' && (
+            <Background variant={BackgroundVariant.Dots} gap={22} size={1.6} color="#c4c7c9" />
+          )}
+          {view.background === 'grid' && (
+            <>
+              {/* Two passes: a fine grid, and a heavier one every fifth line, so
+                  the canvas reads as graph paper rather than as one flat mesh. */}
+              <Background id="fine" variant={BackgroundVariant.Lines} gap={22} lineWidth={1} color="#e8eaed" />
+              <Background id="major" variant={BackgroundVariant.Lines} gap={110} lineWidth={1} color="#dadce0" />
+            </>
+          )}
+          <CanvasOptions view={view} onChange={(next) => { setView((v) => ({ ...v, ...next })); markDirty() }} />
           <Controls showInteractive={false} />
           <MiniMap pannable zoomable maskColor="rgba(241,243,244,0.75)" nodeColor="#dadce0" nodeStrokeColor="#9aa0a6" />
         </ReactFlow>

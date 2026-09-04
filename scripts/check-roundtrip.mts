@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { fromFlow, toFlow, type KazeEdge, type KazeNode } from '../src/renderer/src/diagram-model.ts'
+import { fromFlow, toFlow, viewOf, type KazeEdge, type KazeNode } from '../src/renderer/src/diagram-model.ts'
 import { getService, SERVICES } from '../src/shared/services.ts'
 import type { Diagram } from '../src/shared/types.ts'
 
@@ -43,7 +43,8 @@ const edges: KazeEdge[] = [
 const checks: Array<[string, boolean, string?]> = []
 const check = (name: string, pass: boolean, detail = '') => checks.push([name, pass, detail])
 
-const saved: Diagram = fromFlow(nodes, edges, 'url-shortener')
+const VIEW = { edgeStyle: 'smoothstep', background: 'grid' } as const
+const saved: Diagram = fromFlow(nodes, edges, 'url-shortener', VIEW)
 
 check('10 services survive the split', saved.nodes.length === 10, `${saved.nodes.length}`)
 check('3 boundaries survive the split', saved.groups.length === 3, `${saved.groups.length}`)
@@ -57,8 +58,16 @@ check('an untyped edge stays untyped', saved.edges.find((e) => e.id === 'e-n3-n4
 
 // The actual round trip: reload what we saved, save it again, compare.
 const reloaded = toFlow(saved)
-const resaved = fromFlow(reloaded.nodes, reloaded.edges, 'url-shortener')
+const resaved = fromFlow(reloaded.nodes, reloaded.edges, 'url-shortener', viewOf(saved))
 check('round trip is lossless', JSON.stringify(saved) === JSON.stringify(resaved))
+
+// View settings ride along with the diagram so the canvas looks the same when
+// you come back, but they are presentation and must never reach the reviewer.
+check('the line style survives the round trip', resaved.edgeStyle === 'smoothstep', String(resaved.edgeStyle))
+check('the background survives the round trip', resaved.background === 'grid', String(resaved.background))
+check('every edge is drawn in the chosen style', reloaded.edges.every((e) => e.type === 'smoothstep'))
+check('a diagram with no view settings falls back to the defaults',
+  viewOf({ ...saved, edgeStyle: undefined, background: undefined }).edgeStyle === 'bezier')
 
 // A parent must precede its children or React Flow paints children detached.
 const order = reloaded.nodes.map((n) => n.id)

@@ -146,6 +146,13 @@ check('serialized design carries an untyped edge as untyped', text.includes('{ f
 check('serialized design carries the gaps section', text.includes('gaps:') && text.includes('single_az'))
 check('a clean design says so explicitly', serialize(fixed).includes('gaps: []'))
 
+// Presentation must not leak into the document the reviewer reads: whether a
+// connection is drawn curved or square-cornered is not something to have an
+// opinion about, and putting it in the design would invite one.
+const styled = serialize({ ...flawed, edgeStyle: 'smoothstep', background: 'grid' })
+check('the serialized design carries no view settings',
+  !styled.includes('edgeStyle') && !styled.includes('smoothstep') && !styled.includes('background'))
+
 if (process.argv.includes('--print')) {
   console.log('\n--- serialize(flawed) ---\n')
   console.log(text)

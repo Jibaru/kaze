@@ -1138,3 +1138,35 @@ button, input, select { font-family: inherit; font-size: inherit; color: inherit
 @keyframes askpop-in {
   from { opacity: 0; transform: translateY(6px); }
 }
+
+/* ── canvas options ─────────────────────────────────────────────────────
+   View settings live on the canvas they affect, not in a rail: they are not
+   part of the design and the reviewer never sees them. */
+.canvasopts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  box-shadow: var(--elev-1);
+  padding: 10px 12px;
+  margin: 12px;
+}
+.canvasopts__row { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+.canvasopts__row > span {
+  font-size: var(--text-xs);
+  line-height: var(--lh-xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.canvasopts select {
+  min-height: 32px;
+  min-width: 168px;
+  background: var(--surface);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-sm);
+  padding: 0 8px;
+  font-size: var(--text-sm);
+}
+.canvasopts select:focus { outline: none; border-color: var(--primary); }

@@ -5,7 +5,7 @@
  * about the save format and vice versa.
  */
 import type { Edge, Node } from '@xyflow/react'
-import type { Diagram, DiagramNode, GroupKind, NodeProps } from '@shared/types'
+import type { BackgroundStyle, Diagram, DiagramNode, EdgeStyle, GroupKind, NodeProps } from '@shared/types'
 
 export type ServiceNodeData = { serviceId: string; label: string; props: NodeProps }
 export type GroupNodeData = { kind: GroupKind; label: string }
@@ -14,6 +14,24 @@ export type KazeNode = Node<ServiceNodeData, 'service'> | Node<GroupNodeData, 'g
 export type KazeEdge = Edge<{ protocol?: string }>
 
 export const GROUP_DEFAULT_SIZE = { width: 420, height: 300 }
+
+/** How the canvas is drawn. Travels with the diagram, never into `kaze-adl`. */
+export interface ViewOptions {
+  edgeStyle: EdgeStyle
+  background: BackgroundStyle
+}
+
+export const DEFAULT_VIEW: ViewOptions = { edgeStyle: 'bezier', background: 'dots' }
+
+/** React Flow calls the bezier one `default`; every other name matches. */
+export const flowEdgeType = (style: EdgeStyle): string => (style === 'bezier' ? 'default' : style)
+
+export function viewOf(diagram: Diagram): ViewOptions {
+  return {
+    edgeStyle: diagram.edgeStyle ?? DEFAULT_VIEW.edgeStyle,
+    background: diagram.background ?? DEFAULT_VIEW.background,
+  }
+}
 
 export function toFlow(diagram: Diagram): { nodes: KazeNode[]; edges: KazeEdge[] } {
   // Groups first: React Flow requires a parent to be earlier in the array than
@@ -35,10 +53,12 @@ export function toFlow(diagram: Diagram): { nodes: KazeNode[]; edges: KazeEdge[]
     ...(n.parentId ? { parentId: n.parentId, extent: 'parent' as const } : {}),
   }))
 
+  const type = flowEdgeType(viewOf(diagram).edgeStyle)
   const edges: KazeEdge[] = diagram.edges.map((e) => ({
     id: e.id,
     source: e.from,
     target: e.to,
+    type,
     label: e.protocol ?? e.label,
     data: e.protocol ? { protocol: e.protocol } : {},
   }))
@@ -46,7 +66,12 @@ export function toFlow(diagram: Diagram): { nodes: KazeNode[]; edges: KazeEdge[]
   return { nodes: [...groups, ...nodes], edges }
 }
 
-export function fromFlow(nodes: KazeNode[], edges: KazeEdge[], scenarioId: string): Diagram {
+export function fromFlow(
+  nodes: KazeNode[],
+  edges: KazeEdge[],
+  scenarioId: string,
+  view: ViewOptions = DEFAULT_VIEW,
+): Diagram {
   const serviceNodes: DiagramNode[] = []
   const groups: Diagram['groups'] = []
 
@@ -78,6 +103,8 @@ export function fromFlow(nodes: KazeNode[], edges: KazeEdge[], scenarioId: strin
   return {
     version: 1,
     scenarioId,
+    edgeStyle: view.edgeStyle,
+    background: view.background,
     nodes: serviceNodes,
     groups,
     edges: edges.map((e) => ({

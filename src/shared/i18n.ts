@@ -33,6 +33,10 @@ export interface Dict {
   scenario: string
   boundaries: string
   services: string
+  edgeStyle: string
+  edgeStyleName: Record<string, string>
+  background: string
+  backgroundName: Record<string, string>
   noScenarios: string
   scenarioLabel: string
   newScenario: string
@@ -151,6 +155,15 @@ const es: Dict = {
   scenario: 'Escenario',
   boundaries: 'Límites',
   services: 'Servicios',
+  edgeStyle: 'Línea',
+  edgeStyleName: {
+    bezier: 'Curva',
+    smoothstep: 'En ángulo redondeado',
+    step: 'En ángulo recto',
+    straight: 'Recta',
+  },
+  background: 'Fondo',
+  backgroundName: { dots: 'Puntos', grid: 'Cuadrícula', none: 'Liso' },
   noScenarios: 'No hay escenarios en el espacio de trabajo.',
   scenarioLabel: 'Escenario de práctica',
   newScenario: 'Nuevo escenario',
@@ -380,6 +393,15 @@ const en: Dict = {
   scenario: 'Scenario',
   boundaries: 'Boundaries',
   services: 'Services',
+  edgeStyle: 'Line',
+  edgeStyleName: {
+    bezier: 'Curved',
+    smoothstep: 'Rounded right angle',
+    step: 'Right angle',
+    straight: 'Straight',
+  },
+  background: 'Background',
+  backgroundName: { dots: 'Dots', grid: 'Grid', none: 'Plain' },
   noScenarios: 'No scenarios found in the workspace.',
   scenarioLabel: 'Practice scenario',
   newScenario: 'New scenario',
