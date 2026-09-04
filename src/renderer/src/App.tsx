@@ -30,6 +30,8 @@ import { Palette } from './palette/Palette'
 import { ScenarioPanel } from './scenario/ScenarioPanel'
 import { Inspector } from './inspector/Inspector'
 import { applyPatch } from '@shared/patch'
+import { serialize } from '@shared/adl'
+import { Toast } from './toast/Toast'
 import { DesignText } from './review/DesignText'
 import { ReviewPanel } from './review/ReviewPanel'
 import { usePushToTalk } from './voice/usePushToTalk'
@@ -72,6 +74,7 @@ function Canvas() {
   const [scenarioId, setScenarioId] = useState('')
   const [view, setView] = useState<ViewOptions>(DEFAULT_VIEW)
   const [fixing, setFixing] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
   /** The diagram as it was before the last applied fix, for a single undo. */
   const [beforeFix, setBeforeFix] = useState<Diagram | null>(null)
   const [hasVoiceKey, setHasVoiceKey] = useState(false)
@@ -252,7 +255,7 @@ function Canvas() {
         width: box.width,
         height: box.height,
       })
-      setStatus(t.imageCopied(size.width, size.height))
+      setToast(t.imageCopied(size.width, size.height))
     } catch (err) {
       setStatus(t.copyFailed(err instanceof Error ? err.message : String(err)))
     } finally {
@@ -311,6 +314,22 @@ function Canvas() {
     setDirty(false)
     setStatus(t.sessionArchived)
   }, [setNodes, setEdges, t])
+
+  /**
+   * The design as the reviewer reads it, on the clipboard.
+   *
+   * Gaps included: the point of pasting this somewhere is to carry the whole
+   * picture, and what the app noticed is part of it.
+   */
+  const copyText = useCallback(async () => {
+    if (nodes.length === 0) {
+      setStatus(t.nothingToCopy)
+      return
+    }
+    const text = serialize(diagram)
+    await window.kaze.copyText(text)
+    setToast(t.textCopied(text.trimEnd().split('\n').length))
+  }, [diagram, nodes.length, t])
 
   const undoFix = useCallback(() => {
     if (!beforeFix) return
@@ -552,6 +571,7 @@ function Canvas() {
               markDirty()
             }}
             onCopyImage={() => void copyImage()}
+            onCopyText={() => void copyText()}
             canCopy={nodes.length > 0}
             onFlipEdges={flipSelectedEdges}
             selectedEdges={selectedEdgeIds.size}
@@ -600,6 +620,8 @@ function Canvas() {
           )}
         </div>
       </aside>
+
+      <Toast message={toast} onDismiss={() => setToast(null)} />
 
       <footer className="statusbar">
         <button

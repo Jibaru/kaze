@@ -188,6 +188,10 @@ ipcMain.handle(
   },
 )
 
+ipcMain.handle('clipboard:write-text', (_e, text: string) => {
+  clipboard.writeText(text)
+})
+
 ipcMain.handle('locale:get', () => currentLocale())
 ipcMain.handle('locale:set', async (_e, locale: Locale) => {
   await writeFile(localePath, locale, 'utf-8')

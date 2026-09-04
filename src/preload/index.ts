@@ -14,6 +14,7 @@ const api: KazeApi = {
   revealScenarios: () => ipcRenderer.invoke('scenario:reveal'),
   captureCanvas: (rect: { x: number; y: number; width: number; height: number }) =>
     ipcRenderer.invoke('canvas:capture', rect),
+  copyText: (text: string) => ipcRenderer.invoke('clipboard:write-text', text),
   cancelScenario: () => ipcRenderer.invoke('scenario:cancel'),
   getLocale: () => ipcRenderer.invoke('locale:get'),
   setLocale: (locale: Locale) => ipcRenderer.invoke('locale:set', locale),

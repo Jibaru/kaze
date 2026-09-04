@@ -75,6 +75,27 @@ function FlipIcon() {
   )
 }
 
+function TextIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden focusable="false">
+      <path
+        d="M6 3.5h8.5L19 8v12.5H6z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M14 3.5V8h5M9 12h7M9 15.5h7M9 8.5h2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 function CameraIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden focusable="false">
@@ -99,6 +120,7 @@ export function CanvasOptions({
   view,
   onChange,
   onCopyImage,
+  onCopyText,
   canCopy,
   onFlipEdges,
   selectedEdges,
@@ -106,6 +128,7 @@ export function CanvasOptions({
   view: ViewOptions
   onChange: (next: Partial<ViewOptions>) => void
   onCopyImage: () => void
+  onCopyText: () => void
   canCopy: boolean
   onFlipEdges: () => void
   /** How many connections are selected; the button is dead without one. */
@@ -153,6 +176,16 @@ export function CanvasOptions({
         title={selectedEdges === 0 ? t.flipEdgeHint : t.flipEdge}
       >
         <FlipIcon />
+      </button>
+
+      <button
+        className="canvasbar__btn"
+        onClick={onCopyText}
+        disabled={!canCopy}
+        aria-label={t.copyText}
+        title={t.copyText}
+      >
+        <TextIcon />
       </button>
 
       <button

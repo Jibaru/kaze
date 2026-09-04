@@ -39,6 +39,8 @@ export interface Dict {
   backgroundName: Record<string, string>
   cycleTo: (name: string) => string
   copyImage: string
+  copyText: string
+  textCopied: (lines: number) => string
   flipEdge: string
   flipEdgeHint: string
   edgesFlipped: (n: number) => string
@@ -188,6 +190,8 @@ const es: Dict = {
   backgroundName: { dots: 'Puntos', grid: 'Cuadrícula', none: 'Liso' },
   cycleTo: (name) => `pulsa para cambiar a ${name.toLowerCase()}`,
   copyImage: 'Copiar el diagrama como imagen',
+  copyText: 'Copiar el diagrama como texto',
+  textCopied: (n) => `Texto del diagrama copiado · ${n} ${n === 1 ? 'línea' : 'líneas'}`,
   flipEdge: 'Invertir el sentido de la conexión',
   flipEdgeHint: 'Selecciona una conexión para invertirla',
   edgesFlipped: (n) => `${n} ${n === 1 ? 'conexión invertida' : 'conexiones invertidas'}`,
@@ -449,6 +453,8 @@ const en: Dict = {
   backgroundName: { dots: 'Dots', grid: 'Grid', none: 'Plain' },
   cycleTo: (name) => `click for ${name.toLowerCase()}`,
   copyImage: 'Copy the diagram as an image',
+  copyText: 'Copy the diagram as text',
+  textCopied: (n) => `Diagram text copied · ${n} line${n === 1 ? '' : 's'}`,
   flipEdge: 'Reverse the connection',
   flipEdgeHint: 'Select a connection to reverse it',
   edgesFlipped: (n) => `${n} connection${n === 1 ? '' : 's'} reversed`,

@@ -189,6 +189,8 @@ export interface KazeApi {
     width: number
     height: number
   }): Promise<{ width: number; height: number }>
+  /** Puts text on the system clipboard. */
+  copyText(text: string): Promise<void>
   /** Abandon an authoring turn: closing the dialog should not leave it running. */
   cancelScenario(): Promise<void>
   getLocale(): Promise<import('./i18n').Locale>

@@ -1306,3 +1306,52 @@ button, input, select { font-family: inherit; font-size: inherit; color: inherit
 @media (prefers-reduced-motion: no-preference) {
   [popover].menu:popover-open { animation: askpop-in 120ms cubic-bezier(0.2, 0, 0, 1); }
 }
+
+/* ── toast ──────────────────────────────────────────────────────────────
+   Confirmations sit above the status bar, in the middle, where the eye
+   already is. The status bar keeps ongoing state; this is for the thing that
+   just happened, which is easy to miss in a corner. */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 76px;
+  transform: translateX(-50%);
+  z-index: 10;
+
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  max-width: min(560px, calc(100vw - 48px));
+  padding: 12px 12px 12px 20px;
+  border-radius: var(--radius);
+  /* Material's snackbar is a dark surface whatever the theme, so it reads as
+     a notification rather than as another panel. */
+  background: var(--grey-900);
+  color: var(--grey-50);
+  box-shadow: 0 4px 8px 3px rgba(60, 64, 67, 0.15), 0 1px 3px rgba(60, 64, 67, 0.3);
+}
+
+.toast__text { font-size: var(--text-md); line-height: var(--lh-md); }
+
+.toast__close {
+  flex: none;
+  min-height: 32px;
+  padding: 0 12px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-pill);
+  color: #8ab4f8; /* 7.1:1 on #202124 — the light-surface blue fails there */
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+.toast__close:hover { background: rgba(138, 180, 248, 0.12); }
+.toast__close:focus-visible { outline-color: #8ab4f8; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .toast { animation: toast-in 160ms cubic-bezier(0.2, 0, 0, 1); }
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, 10px); }
+}
