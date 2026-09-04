@@ -46,19 +46,51 @@ referencian.
 
 The interface is Spanish by default; English is a click away in the status bar.
 
-## Running it
+## Installing it
+
+```bash
+npm install
+npm run dist
+```
+
+That writes a per-user Windows installer to `dist/` — `Kaze Setup 0.1.0.exe`.
+It needs no administrator, puts Kaze in the Start menu and on the desktop, and
+uninstalls from Settings like anything else. It is unsigned, so SmartScreen
+will warn on the first run: **More info → Run anyway**.
+
+`npm run dist` also builds a `.dmg` on macOS and an `AppImage` on Linux, from
+the same config.
+
+## Running it from source
 
 ```bash
 npm install
 npm run dev
 ```
 
-You need Claude Code installed and logged in. Paste an OpenAI key into the voice
-bar to enable speech; everything else works without one.
+`npm run dev` reloads the renderer as you edit and restarts main when it
+changes. `npm run build && npm start` runs the built app instead, which is what
+the installer ships.
+
+## What it needs
+
+- **Claude Code, installed and logged in.** Kaze drives the `claude` on your
+  PATH over your existing OAuth session; there is no API key and no separate
+  account. It falls back to the SDK's own bundled binary if it cannot find
+  yours, which works but is not the one you are used to.
+- **An OpenAI key, for voice only.** Paste it into the field in the status bar.
+  It is encrypted with the OS keystore and never leaves the main process.
+  Without one the app still reviews, still writes, still draws — it just does
+  not listen or speak, and conversation mode is unavailable.
+
+Your work lives in `%APPDATA%/kaze/workspace` (`~/Library/Application Support`
+on macOS): scenarios you write, every numbered revision, the findings ledger,
+and the attempts you set aside with **Empezar de cero**. Nothing there is ever
+deleted by the app.
 
 | | |
 |---|---|
-| `npm run check` | offline suites (92 checks) |
+| `npm run check` | offline suites (269 checks) |
 | `npm run check:live` | end-to-end review + the fix-and-resolve loop (costs money) |
 | `npm run check:voice` | speech round trip (needs `OPENAI_API_KEY`) |
 
@@ -84,6 +116,8 @@ exist because they answer different questions: `--border` separates surfaces,
 |---|---|
 | Hold **Space** | review the current design |
 | Hold **Shift+Space** | ask a question instead |
+| **Conversar** | design out loud: the diagram and nothing else, microphone open |
+| Hold **Space** *(in conversation)* | talk regardless of what the detector thinks |
 | **Ctrl+1 / 2 / 3** | inspector · design text · review |
 | **Ctrl+Enter** | review without speaking |
 | **Escape** | stop the turn |

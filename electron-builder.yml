@@ -1,0 +1,52 @@
+# Packaging. `npm run dist` turns the built app into an installer.
+#
+# Everything the renderer and preload need is bundled by electron-vite, so the
+# only thing that has to travel as a real dependency is the Agent SDK.
+
+appId: dev.kaze.app
+productName: Kaze
+copyright: Kaze
+
+directories:
+  buildResources: build
+  output: dist
+
+files:
+  - out/**
+  - package.json
+
+# The scenario bank, CLAUDE.md and the review skill. Main looks for these at
+# `process.resourcesPath/workspace` when packaged, and copies them into the
+# user's workspace on every launch, so a new version ships a new rubric.
+extraResources:
+  - from: workspace
+    to: workspace
+
+# The SDK ships its own `claude` binary. Kaze drives the one on your PATH — that
+# is the whole premise — but the SDK's is the fallback, and a binary inside an
+# asar archive cannot be executed.
+asarUnpack:
+  - node_modules/@anthropic-ai/claude-agent-sdk/**
+
+win:
+  target: nsis
+  # Unsigned. Windows SmartScreen will say so on first run: More info → Run
+  # anyway. Signing needs a certificate, which a personal tool does not have.
+  signAndEditExecutable: false
+
+nsis:
+  # Per-user, so it installs without asking for administrator.
+  perMachine: false
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Kaze
+
+mac:
+  target: dmg
+  category: public.app-category.developer-tools
+
+linux:
+  target: AppImage
+  category: Development
