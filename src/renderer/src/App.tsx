@@ -345,9 +345,9 @@ function Canvas() {
           proOptions={{ hideAttribution: false }}
           defaultEdgeOptions={{ animated: false }}
         >
-          <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#232c38" />
+          <Background variant={BackgroundVariant.Dots} gap={22} size={1.4} color="#dadce0" />
           <Controls showInteractive={false} />
-          <MiniMap pannable zoomable maskColor="rgba(13,17,23,0.7)" nodeColor="#2a3542" />
+          <MiniMap pannable zoomable maskColor="rgba(241,243,244,0.75)" nodeColor="#dadce0" nodeStrokeColor="#9aa0a6" />
         </ReactFlow>
       </main>
 

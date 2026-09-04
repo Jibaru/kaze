@@ -56,7 +56,7 @@ function createWindow(): void {
     minWidth: 1100,
     minHeight: 700,
     show: false,
-    backgroundColor: '#0d1117',
+    backgroundColor: '#f8f9fa',
     title: 'Kaze',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

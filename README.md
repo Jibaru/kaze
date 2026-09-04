@@ -41,6 +41,20 @@ bar to enable speech; everything else works without one.
 | `npm run check:live` | end-to-end review + the fix-and-resolve loop (costs money) |
 | `npm run check:voice` | speech round trip (needs `OPENAI_API_KEY`) |
 
+## Look and feel
+
+The interface follows Google's own developer-site system, taken from the values
+that site ships rather than from an impression of it: Roboto and Roboto Mono
+(self-hosted, so the app renders offline and its CSP stays closed to remote
+origins), `#fff` / `#f8f9fa` / `#f1f3f4` surfaces, `#202124` text, `#1a73e8`
+primary, Material elevation and pill-shaped actions. Google Sans carries the
+headings where the machine has it and falls back to Roboto where it does not.
+
+Colour is a two-tier system — primitives name a value, semantic tokens name a
+job — and every text pair is measured rather than judged. Two border roles
+exist because they answer different questions: `--border` separates surfaces,
+`--border-control` outlines inputs and clears the 3:1 non-text minimum.
+
 `PLAN.md` records the design decisions and why each one was made.
 
 ## Keys
