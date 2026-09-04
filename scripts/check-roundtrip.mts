@@ -1,0 +1,90 @@
+/**
+ * Phase 1 exit criterion, mechanically: a ten-node design with boundaries,
+ * nested children, configured props and edges survives
+ * flow -> save format -> flow -> save format unchanged.
+ *
+ * Run: node --experimental-strip-types scripts/check-roundtrip.mts
+ */
+import assert from 'node:assert/strict'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fromFlow, toFlow, type KazeEdge, type KazeNode } from '../src/renderer/src/diagram-model.ts'
+import { getService, SERVICES } from '../src/shared/services.ts'
+import type { Diagram } from '../src/shared/types.ts'
+
+const nodes: KazeNode[] = [
+  { id: 'vpc', type: 'group', position: { x: 40, y: 40 }, data: { kind: 'vpc', label: 'main' }, style: { width: 900, height: 520 } },
+  { id: 'az-a', type: 'group', position: { x: 20, y: 60 }, data: { kind: 'az', label: 'eu-west-1a' }, style: { width: 420, height: 420 }, parentId: 'vpc', extent: 'parent' },
+  { id: 'az-b', type: 'group', position: { x: 460, y: 60 }, data: { kind: 'az', label: 'eu-west-1b' }, style: { width: 420, height: 420 }, parentId: 'vpc', extent: 'parent' },
+  { id: 'n1', type: 'service', position: { x: 60, y: -140 }, data: { serviceId: 'Route53', label: 'dns', props: { routing_policy: 'latency' } } },
+  { id: 'n2', type: 'service', position: { x: 320, y: -140 }, data: { serviceId: 'CloudFront', label: 'cdn', props: { tls: true, cache_policy: '60s on /r/*' } } },
+  { id: 'n3', type: 'service', position: { x: 200, y: 8 }, data: { serviceId: 'ALB', label: 'edge-lb', props: { tls: true } }, parentId: 'vpc', extent: 'parent' },
+  { id: 'n4', type: 'service', position: { x: 40, y: 60 }, data: { serviceId: 'ECS', label: 'shortener-api', props: { launch_type: 'fargate' } }, parentId: 'az-a', extent: 'parent' },
+  { id: 'n5', type: 'service', position: { x: 40, y: 200 }, data: { serviceId: 'RDS', label: 'links-db', props: { engine: 'postgres', multi_az: false } }, parentId: 'az-a', extent: 'parent' },
+  { id: 'n6', type: 'service', position: { x: 40, y: 60 }, data: { serviceId: 'ElastiCache', label: 'hot-links', props: { engine: 'redis' } }, parentId: 'az-b', extent: 'parent' },
+  { id: 'n7', type: 'service', position: { x: 40, y: 200 }, data: { serviceId: 'SQS', label: 'click-events', props: { dlq: true } }, parentId: 'az-b', extent: 'parent' },
+  { id: 'n8', type: 'service', position: { x: 120, y: 640 }, data: { serviceId: 'Lambda', label: 'click-aggregator', props: {} } },
+  { id: 'n9', type: 'service', position: { x: 400, y: 640 }, data: { serviceId: 'DynamoDB', label: 'click-counts', props: { partition_key: 'short_code', capacity: 'on-demand' } } },
+  { id: 'n10', type: 'service', position: { x: 690, y: 640 }, data: { serviceId: 'S3', label: 'raw-clicks', props: { versioning: true, lifecycle: 'IA at 30d' } } },
+]
+
+const edges: KazeEdge[] = [
+  { id: 'e-n1-n2', source: 'n1', target: 'n2', data: { protocol: 'DNS' } },
+  { id: 'e-n2-n3', source: 'n2', target: 'n3', data: { protocol: 'HTTPS' } },
+  { id: 'e-n3-n4', source: 'n3', target: 'n4', data: {} },
+  { id: 'e-n4-n5', source: 'n4', target: 'n5', data: { protocol: 'TCP/5432' } },
+  { id: 'e-n4-n6', source: 'n4', target: 'n6', data: { protocol: 'RESP' } },
+  { id: 'e-n4-n7', source: 'n4', target: 'n7', data: {} },
+  { id: 'e-n7-n8', source: 'n7', target: 'n8', data: {} },
+  { id: 'e-n8-n9', source: 'n8', target: 'n9', data: {} },
+  { id: 'e-n8-n10', source: 'n8', target: 'n10', data: {} },
+]
+
+const checks: Array<[string, boolean, string?]> = []
+const check = (name: string, pass: boolean, detail = '') => checks.push([name, pass, detail])
+
+const saved: Diagram = fromFlow(nodes, edges, 'url-shortener')
+
+check('10 services survive the split', saved.nodes.length === 10, `${saved.nodes.length}`)
+check('3 boundaries survive the split', saved.groups.length === 3, `${saved.groups.length}`)
+check('9 edges survive the split', saved.edges.length === 9, `${saved.edges.length}`)
+check('containment is preserved', saved.nodes.find((n) => n.id === 'n5')?.parentId === 'az-a')
+check('nested boundaries are preserved', saved.groups.find((g) => g.id === 'az-a')?.parentId === 'vpc')
+check('group size is preserved', saved.groups.find((g) => g.id === 'vpc')?.width === 900)
+check('props are preserved', saved.nodes.find((n) => n.id === 'n9')?.props.partition_key === 'short_code')
+check('protocols are preserved', saved.edges.find((e) => e.id === 'e-n4-n5')?.protocol === 'TCP/5432')
+check('an untyped edge stays untyped', saved.edges.find((e) => e.id === 'e-n3-n4')?.protocol === undefined)
+
+// The actual round trip: reload what we saved, save it again, compare.
+const reloaded = toFlow(saved)
+const resaved = fromFlow(reloaded.nodes, reloaded.edges, 'url-shortener')
+check('round trip is lossless', JSON.stringify(saved) === JSON.stringify(resaved))
+
+// A parent must precede its children or React Flow paints children detached.
+const order = reloaded.nodes.map((n) => n.id)
+const parentsFirst = reloaded.nodes.every(
+  (n) => !n.parentId || order.indexOf(n.parentId) < order.indexOf(n.id),
+)
+check('parents are ordered before their children', parentsFirst)
+
+// Every serviceId in a design must resolve, or the canvas renders a blank box.
+check('every service id resolves in the manifest', saved.nodes.every((n) => Boolean(getService(n.serviceId))))
+check('manifest ids are unique', new Set(SERVICES.map((s) => s.id)).size === SERVICES.length, `${SERVICES.length} services`)
+
+for (const [name, pass, detail] of checks) {
+  console.log(`${pass ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`)
+}
+
+// Seed the app's workspace so a launch shows this design rather than a blank canvas.
+const seed = process.argv.includes('--seed-to')
+  ? process.argv[process.argv.indexOf('--seed-to') + 1]
+  : null
+if (seed) {
+  mkdirSync(dirname(seed), { recursive: true })
+  writeFileSync(seed, JSON.stringify(saved, null, 2), 'utf-8')
+  console.log(`\nseeded ${seed}`)
+}
+
+const failed = checks.filter(([, pass]) => !pass)
+console.log(`\n${checks.length - failed.length}/${checks.length} checks passed`)
+assert.equal(failed.length, 0)

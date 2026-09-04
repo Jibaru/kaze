@@ -1,0 +1,11 @@
+{
+  "name": "kaze-spike",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "spike": "node run.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "0.3.260"
+  }
+}

@@ -1,0 +1,68 @@
+/**
+ * Service id -> icon component. Kept apart from the manifest so the serializer
+ * (which runs in the main process) never imports React.
+ */
+import type { AwsIconComponent } from '@aws-icons/react'
+import {
+  AmazonApiGateway,
+  AmazonAthena,
+  AmazonAurora,
+  AmazonCloudFront,
+  AmazonCloudWatch,
+  AmazonCognito,
+  AmazonDynamoDb,
+  AmazonEc2,
+  AmazonEfs,
+  AmazonElastiCache,
+  AmazonElasticContainerService,
+  AmazonElasticKubernetesService,
+  AmazonEventBridge,
+  AmazonKinesisDataStreams,
+  AmazonOpenSearchService,
+  AmazonRds,
+  AmazonRedshift,
+  AmazonRoute53,
+  AmazonSimpleNotificationService,
+  AmazonSimpleQueueService,
+  AmazonSimpleStorageService,
+  AwsFargate,
+  AwsGlue,
+  AwsLambda,
+  AwsSecretsManager,
+  AwsStepFunctions,
+  AwsWaf,
+  ElasticLoadBalancing,
+} from '@aws-icons/react/architecture-service'
+
+export const SERVICE_ICONS: Record<string, AwsIconComponent> = {
+  Route53: AmazonRoute53,
+  CloudFront: AmazonCloudFront,
+  WAF: AwsWaf,
+  ALB: ElasticLoadBalancing,
+  APIGateway: AmazonApiGateway,
+  Lambda: AwsLambda,
+  EC2: AmazonEc2,
+  ECS: AmazonElasticContainerService,
+  Fargate: AwsFargate,
+  EKS: AmazonElasticKubernetesService,
+  RDS: AmazonRds,
+  Aurora: AmazonAurora,
+  DynamoDB: AmazonDynamoDb,
+  ElastiCache: AmazonElastiCache,
+  OpenSearch: AmazonOpenSearchService,
+  Redshift: AmazonRedshift,
+  S3: AmazonSimpleStorageService,
+  EFS: AmazonEfs,
+  SQS: AmazonSimpleQueueService,
+  SNS: AmazonSimpleNotificationService,
+  EventBridge: AmazonEventBridge,
+  StepFunctions: AwsStepFunctions,
+  Kinesis: AmazonKinesisDataStreams,
+  Glue: AwsGlue,
+  Athena: AmazonAthena,
+  Cognito: AmazonCognito,
+  SecretsManager: AwsSecretsManager,
+  CloudWatch: AmazonCloudWatch,
+}
+
+export const getServiceIcon = (id: string): AwsIconComponent | undefined => SERVICE_ICONS[id]

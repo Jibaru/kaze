@@ -1,0 +1,10 @@
+node_modules/
+out/
+dist/
+.kaze-check/
+
+# Third-party skills installed by `npx skills add mattpocock/skills`.
+# Re-installable, and .claude/skills is a tree of symlinks that does not
+# survive a clone cleanly on Windows.
+/.agents/
+/.claude/

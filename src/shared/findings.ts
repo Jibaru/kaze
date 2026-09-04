@@ -1,0 +1,113 @@
+/**
+ * Parsing the review's closing JSON block.
+ *
+ * The model is asked to end its reply with one fenced block. It usually does.
+ * Everything here assumes it sometimes will not, and degrades to markdown-only
+ * rather than failing the review — a review you can read but not file is still
+ * worth having.
+ */
+
+export type Severity = 'high' | 'medium' | 'low'
+export type Verdict = 'solid' | 'needs_work' | 'does_not_meet_brief'
+
+export interface Finding {
+  id: string
+  severity: Severity
+  pillar: string
+  bp_id: string | null
+  nodes: string[]
+  claim: string
+  fix: string
+}
+
+export interface ReviewPayload {
+  verdict: Verdict
+  spoken_summary: string
+  findings: Finding[]
+  resolved: string[]
+}
+
+export interface ParsedReview {
+  /** The review text with the JSON block stripped — what the panel renders. */
+  markdown: string
+  payload: ReviewPayload | null
+  /** Why parsing failed, for the status bar. Null when it succeeded. */
+  problem: string | null
+}
+
+const FENCED = /```(?:json)?\s*\n([\s\S]*?)\n?```/g
+
+const SEVERITIES: Severity[] = ['high', 'medium', 'low']
+const VERDICTS: Verdict[] = ['solid', 'needs_work', 'does_not_meet_brief']
+
+const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : fallback)
+
+/** Coerce rather than reject: a finding with a wrong severity is still a finding. */
+function coerceFinding(raw: unknown, index: number): Finding | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  const claim = str(r.claim)
+  if (!claim) return null
+  const severity = SEVERITIES.includes(r.severity as Severity) ? (r.severity as Severity) : 'medium'
+  return {
+    id: str(r.id) || `f-unnamed-${index}`,
+    severity,
+    pillar: str(r.pillar, 'general'),
+    bp_id: typeof r.bp_id === 'string' && r.bp_id.trim() !== '' ? r.bp_id : null,
+    nodes: Array.isArray(r.nodes) ? r.nodes.filter((n): n is string => typeof n === 'string') : [],
+    claim,
+    fix: str(r.fix),
+  }
+}
+
+function coercePayload(raw: unknown): ReviewPayload | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  if (!Array.isArray(r.findings)) return null
+  const findings = r.findings.map(coerceFinding).filter((f): f is Finding => f !== null)
+  return {
+    verdict: VERDICTS.includes(r.verdict as Verdict) ? (r.verdict as Verdict) : 'needs_work',
+    spoken_summary: str(r.spoken_summary),
+    findings,
+    resolved: Array.isArray(r.resolved) ? r.resolved.filter((x): x is string => typeof x === 'string') : [],
+  }
+}
+
+/**
+ * Takes the *last* parseable fenced block that looks like a review payload.
+ * Last, because the skill is told to close with it and a review may well quote
+ * an example block earlier in its prose.
+ */
+export function parseReview(text: string): ParsedReview {
+  const blocks: Array<{ body: string; start: number; end: number }> = []
+  for (const match of text.matchAll(FENCED)) {
+    blocks.push({ body: match[1]!, start: match.index!, end: match.index! + match[0].length })
+  }
+
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const block = blocks[i]!
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(block.body)
+    } catch {
+      continue
+    }
+    const payload = coercePayload(parsed)
+    if (!payload) continue
+    const markdown = (text.slice(0, block.start) + text.slice(block.end)).trim()
+    return { markdown, payload, problem: null }
+  }
+
+  const sawJson = blocks.length > 0
+  return {
+    markdown: text.trim(),
+    payload: null,
+    problem: sawJson
+      ? 'the review ended with a code block that is not a findings payload'
+      : 'the review did not include a findings block',
+  }
+}
+
+/** One corrective turn is worth trying before giving up on the block. */
+export const REPAIR_PROMPT =
+  'Your last reply did not end with a valid findings block. Re-emit ONLY the fenced ```json block described in the kaze-review skill, for the review you just gave. No other text.'
