@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { fromFlow, toFlow, viewOf, type KazeEdge, type KazeNode } from '../src/renderer/src/diagram-model.ts'
+import { flipEdges, fromFlow, toFlow, viewOf, type KazeEdge, type KazeNode } from '../src/renderer/src/diagram-model.ts'
 import { getService, SERVICES } from '../src/shared/services.ts'
 import type { Diagram } from '../src/shared/types.ts'
 
@@ -83,6 +83,25 @@ const parentsFirst = reloaded.nodes.every(
   (n) => !n.parentId || order.indexOf(n.parentId) < order.indexOf(n.id),
 )
 check('parents are ordered before their children', parentsFirst)
+
+// ── reversing a connection ────────────────────────────────────────────────
+// Direction is meaningful — `from` initiates — and it is already what the
+// review argues about, so getting one backwards has to be fixable.
+const flipped = flipEdges(edges, new Set(['e-n1-n2']))
+const before = edges.find((e) => e.id === 'e-n1-n2')!
+const after = flipped.find((e) => e.id === 'e-n1-n2')!
+check('flipping swaps the ends', after.source === before.target && after.target === before.source,
+  `${after.source} -> ${after.target}`)
+check('flipping swaps the sides too, or the line crosses back over the node',
+  after.sourceHandle === before.targetHandle && after.targetHandle === before.sourceHandle,
+  `${after.sourceHandle} -> ${after.targetHandle}`)
+check('flipping keeps the id: it is the same connection', after.id === before.id)
+check('flipping leaves every other connection alone',
+  flipped.filter((e) => e.id !== 'e-n1-n2').every((e, i) => e === edges.filter((x) => x.id !== 'e-n1-n2')[i]))
+check('flipping twice is the original', (() => {
+  const back = flipEdges(flipped, new Set(['e-n1-n2'])).find((e) => e.id === 'e-n1-n2')!
+  return back.source === before.source && back.sourceHandle === before.sourceHandle
+})())
 
 // Every serviceId in a design must resolve, or the canvas renders a blank box.
 check('every service id resolves in the manifest', saved.nodes.every((n) => Boolean(getService(n.serviceId))))

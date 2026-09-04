@@ -120,6 +120,27 @@ export function fromFlow(
   }
 }
 
+/**
+ * Turn a connection around.
+ *
+ * The handles swap with the ends, or a flipped line would leave from the side
+ * it used to arrive at and cross back over the node. The id is left alone: it
+ * is the same connection, drawn the other way.
+ */
+export function flipEdges(edges: KazeEdge[], ids: Set<string>): KazeEdge[] {
+  return edges.map((e) =>
+    ids.has(e.id)
+      ? {
+          ...e,
+          source: e.target,
+          target: e.source,
+          sourceHandle: e.targetHandle ?? null,
+          targetHandle: e.sourceHandle ?? null,
+        }
+      : e,
+  )
+}
+
 /** Node ids are user-visible: they appear in findings ("the DB at n5"). */
 export function nextNodeId(existing: KazeNode[]): string {
   const used = new Set(existing.filter((n) => n.type === 'service').map((n) => n.id))

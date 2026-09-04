@@ -15,6 +15,14 @@ The design is `kaze-adl`: a YAML block listing `groups` (boundaries), `nodes`
 (services with configured props), `edges` (connections with protocols), and
 `gaps` (omissions the app detected mechanically).
 
+`edges` are directed and the direction is meaningful: **`from` is whoever
+initiates, `to` is whoever receives the call.** A service reading a database is
+`service -> database`, because the service makes the request; the data coming
+back is not a second edge. Judge coupling, failure propagation and where
+retries and timeouts belong from that direction, and say so when an edge points
+the wrong way — a datastore that only initiates calls into compute is almost
+always a drawing mistake rather than a design.
+
 Two node types are not AWS services:
 
 - `service: Actor` is the person or system on the other end — a user, a partner,

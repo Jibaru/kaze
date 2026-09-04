@@ -39,6 +39,9 @@ export interface Dict {
   backgroundName: Record<string, string>
   cycleTo: (name: string) => string
   copyImage: string
+  flipEdge: string
+  flipEdgeHint: string
+  edgesFlipped: (n: number) => string
   imageCopied: (width: number, height: number) => string
   nothingToCopy: string
   copyFailed: (reason: string) => string
@@ -171,6 +174,9 @@ const es: Dict = {
   backgroundName: { dots: 'Puntos', grid: 'Cuadrícula', none: 'Liso' },
   cycleTo: (name) => `pulsa para cambiar a ${name.toLowerCase()}`,
   copyImage: 'Copiar el diagrama como imagen',
+  flipEdge: 'Invertir el sentido de la conexión',
+  flipEdgeHint: 'Selecciona una conexión para invertirla',
+  edgesFlipped: (n) => `${n} ${n === 1 ? 'conexión invertida' : 'conexiones invertidas'}`,
   imageCopied: (w, h) => `Diagrama copiado al portapapeles · ${w}×${h}`,
   nothingToCopy: 'No hay nada que copiar todavía.',
   copyFailed: (reason) => `No se pudo copiar el diagrama: ${reason}`,
@@ -414,6 +420,9 @@ const en: Dict = {
   backgroundName: { dots: 'Dots', grid: 'Grid', none: 'Plain' },
   cycleTo: (name) => `click for ${name.toLowerCase()}`,
   copyImage: 'Copy the diagram as an image',
+  flipEdge: 'Reverse the connection',
+  flipEdgeHint: 'Select a connection to reverse it',
+  edgesFlipped: (n) => `${n} connection${n === 1 ? '' : 's'} reversed`,
   imageCopied: (w, h) => `Diagram copied to the clipboard · ${w}×${h}`,
   nothingToCopy: 'Nothing to copy yet.',
   copyFailed: (reason) => `Could not copy the diagram: ${reason}`,

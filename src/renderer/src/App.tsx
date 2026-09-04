@@ -5,6 +5,7 @@ import {
   BackgroundVariant,
   ConnectionMode,
   Controls,
+  MarkerType,
   MiniMap,
   ReactFlow,
   ReactFlowProvider,
@@ -36,6 +37,7 @@ import { LocaleProvider, useLocale } from './i18n/useLocale'
 import {
   DEFAULT_VIEW,
   flowEdgeType,
+  flipEdges,
   fromFlow,
   GROUP_DEFAULT_SIZE,
   nextGroupId,
@@ -83,7 +85,22 @@ function Canvas() {
   // type is applied at render time. Changing the setting should redraw the
   // diagram you already have, not just the next connection you make.
   const drawnEdges = useMemo(
-    () => edges.map((e) => ({ ...e, type: flowEdgeType(view.edgeStyle) })),
+    () =>
+      edges.map((e) => ({
+        ...e,
+        type: flowEdgeType(view.edgeStyle),
+        // The arrow points at whoever receives the call. Direction is already
+        // in the serialized design and the review already argues about it, so
+        // leaving it invisible means reviewing a claim the user cannot see.
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          width: 18,
+          height: 18,
+          // Markers are SVG defs, not CSS, so the selected colour has to be
+          // chosen here rather than inherited from the path.
+          color: e.selected ? '#1a73e8' : '#9aa0a6',
+        },
+      })),
     [edges, view.edgeStyle],
   )
   const serviceCount = nodes.filter((n) => n.type === 'service').length
@@ -238,6 +255,18 @@ function Canvas() {
       setViewport(previousViewport)
     }
   }, [nodes, t, fitView, getViewport, setViewport])
+
+  const selectedEdgeIds = useMemo(
+    () => new Set(edges.filter((e) => e.selected).map((e) => e.id)),
+    [edges],
+  )
+
+  const flipSelectedEdges = useCallback(() => {
+    if (selectedEdgeIds.size === 0) return
+    setEdges((current) => flipEdges(current, selectedEdgeIds))
+    markDirty()
+    setStatus(t.edgesFlipped(selectedEdgeIds.size))
+  }, [selectedEdgeIds, setEdges, markDirty, t])
 
   const selectNodes = useCallback(
     (ids: string[]) => {
@@ -458,6 +487,8 @@ function Canvas() {
             }}
             onCopyImage={() => void copyImage()}
             canCopy={nodes.length > 0}
+            onFlipEdges={flipSelectedEdges}
+            selectedEdges={selectedEdgeIds.size}
           />
           <Controls showInteractive={false} />
           <MiniMap pannable zoomable maskColor="rgba(241,243,244,0.75)" nodeColor="#dadce0" nodeStrokeColor="#9aa0a6" />

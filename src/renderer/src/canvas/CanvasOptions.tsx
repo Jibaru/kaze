@@ -60,6 +60,21 @@ function BackgroundIcon({ style }: { style: BackgroundStyle }) {
   )
 }
 
+function FlipIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden focusable="false">
+      <path
+        d="M4 9h13m0 0-3.5-3.5M17 9l-3.5 3.5M20 15H7m0 0 3.5-3.5M7 15l3.5 3.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 function CameraIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden focusable="false">
@@ -85,11 +100,16 @@ export function CanvasOptions({
   onChange,
   onCopyImage,
   canCopy,
+  onFlipEdges,
+  selectedEdges,
 }: {
   view: ViewOptions
   onChange: (next: Partial<ViewOptions>) => void
   onCopyImage: () => void
   canCopy: boolean
+  onFlipEdges: () => void
+  /** How many connections are selected; the button is dead without one. */
+  selectedEdges: number
 }) {
   const t = useT()
 
@@ -124,6 +144,16 @@ export function CanvasOptions({
       </button>
 
       <span className="canvasbar__sep" aria-hidden />
+
+      <button
+        className="canvasbar__btn"
+        onClick={onFlipEdges}
+        disabled={selectedEdges === 0}
+        aria-label={selectedEdges === 0 ? t.flipEdgeHint : t.flipEdge}
+        title={selectedEdges === 0 ? t.flipEdgeHint : t.flipEdge}
+      >
+        <FlipIcon />
+      </button>
 
       <button
         className="canvasbar__btn"
