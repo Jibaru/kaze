@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { edgeText, flipEdges, fromFlow, toFlow, viewOf, type KazeEdge, type KazeNode } from '../src/renderer/src/diagram-model.ts'
+import { absoluteBoxes, autoSides, edgeText, flipEdges, fromFlow, toFlow, viewOf, type KazeEdge, type KazeNode } from '../src/renderer/src/diagram-model.ts'
 import { getService, SERVICES } from '../src/shared/services.ts'
 import type { Diagram } from '../src/shared/types.ts'
 
@@ -114,6 +114,36 @@ check('flipping swaps the sides too, or the line crosses back over the node',
 check('flipping keeps the id: it is the same connection', after.id === before.id)
 check('flipping leaves every other connection alone',
   flipped.filter((e) => e.id !== 'e-n1-n2').every((e, i) => e === edges.filter((x) => x.id !== 'e-n1-n2')[i]))
+// ── which side a line attaches to ─────────────────────────────────────────
+// A connection the model added says what talks to what and nothing about
+// geometry. Without this every line left the top of one box and arrived at the
+// top of another, looping around everything between them.
+const sides = (ax: number, ay: number, bx: number, by: number) =>
+  autoSides({ x: ax, y: ay, width: 140, height: 40 }, { x: bx, y: by, width: 140, height: 40 })
+
+check('a box to the right is entered from its left',
+  JSON.stringify(sides(0, 0, 300, 0)) === JSON.stringify({ sourceHandle: 'right', targetHandle: 'left' }))
+check('and one to the left from its right',
+  sides(300, 0, 0, 0).sourceHandle === 'left' && sides(300, 0, 0, 0).targetHandle === 'right')
+check('a box below is entered from its top',
+  sides(0, 0, 0, 300).sourceHandle === 'bottom' && sides(0, 0, 0, 300).targetHandle === 'top')
+check('and one above from its bottom',
+  sides(0, 300, 0, 0).sourceHandle === 'top' && sides(0, 300, 0, 0).targetHandle === 'bottom')
+check('a tie reads left to right, because these diagrams do',
+  sides(0, 0, 200, 200).sourceHandle === 'right', sides(0, 0, 200, 200).sourceHandle)
+check('the far side is never chosen: a line does not cross its own box',
+  sides(0, 0, 300, 40).sourceHandle === 'right' && sides(0, 0, -300, 40).sourceHandle === 'left')
+
+// A node inside a boundary is positioned relative to it, so two nodes in
+// different boundaries only compare once the parents are added up.
+const boxes = absoluteBoxes(nodes)
+check('a node inside a boundary is placed on the canvas, not on its parent',
+  boxes.get('n4')?.x === 40 + 20 + 40 && boxes.get('n4')?.y === 40 + 60 + 60,
+  JSON.stringify(boxes.get('n4')))
+check('a node outside every boundary is where it says it is',
+  boxes.get('n1')?.x === 60 && boxes.get('n1')?.y === -140)
+check('every node gets a box', boxes.size === nodes.length)
+
 check('flipping twice is the original', (() => {
   const back = flipEdges(flipped, new Set(['e-n1-n2'])).find((e) => e.id === 'e-n1-n2')!
   return back.source === before.source && back.sourceHandle === before.sourceHandle

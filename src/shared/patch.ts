@@ -84,8 +84,10 @@ export function parsePatch(value: unknown, options: ParseOptions = {}): PatchOp[
  * Still the app's decision, not the model's. Coordinates are not something it
  * can reason about, and asking would only spend a round trip on a worse answer.
  */
-const CELL = { x: 260, y: 150 }
-const CLEAR = { x: 210, y: 100 }
+// Wide enough that the protocol chip on a connection fits in the gap between
+// two boxes rather than being squeezed onto the line.
+const CELL = { x: 340, y: 170 }
+const CLEAR = { x: 280, y: 110 }
 
 function placeNode(
   taken: Array<{ x: number; y: number }>,

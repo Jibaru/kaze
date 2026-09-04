@@ -178,3 +178,82 @@ export function nextGroupId(existing: KazeNode[], kind: GroupKind): string {
     if (!used.has(id)) return id
   }
 }
+
+/**
+ * Which side of each box a connection should leave from and arrive at.
+ *
+ * A connection drawn by hand carries the sides you dragged between. One the
+ * model added carries none — it says what talks to what, which is the part it
+ * can reason about, and nothing about geometry, which it cannot. React Flow
+ * then falls back to the same default handle for every edge, so every line
+ * leaves the top of one box and arrives at the top of another and loops around
+ * everything in between.
+ *
+ * So the sides are chosen from where the boxes actually are. Horizontal wins
+ * ties because these diagrams read left to right: request goes right, storage
+ * hangs below.
+ *
+ * Deliberately computed for drawing and never saved. It is not a decision
+ * anyone made — it is a consequence of the current layout, and it should follow
+ * the boxes when you drag them rather than freezing the first arrangement the
+ * model happened to produce.
+ */
+const HANDLE_DEFAULT_SIZE = { width: 140, height: 40 }
+
+export function autoSides(
+  from: { x: number; y: number; width?: number; height?: number },
+  to: { x: number; y: number; width?: number; height?: number },
+): { sourceHandle: string; targetHandle: string } {
+  const centre = (n: { x: number; y: number; width?: number; height?: number }) => ({
+    x: n.x + (n.width ?? HANDLE_DEFAULT_SIZE.width) / 2,
+    y: n.y + (n.height ?? HANDLE_DEFAULT_SIZE.height) / 2,
+  })
+  const a = centre(from)
+  const b = centre(to)
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx >= 0
+      ? { sourceHandle: 'right', targetHandle: 'left' }
+      : { sourceHandle: 'left', targetHandle: 'right' }
+  }
+  return dy >= 0
+    ? { sourceHandle: 'bottom', targetHandle: 'top' }
+    : { sourceHandle: 'top', targetHandle: 'bottom' }
+}
+
+/**
+ * Where every node is on the canvas, not on its parent.
+ *
+ * A node inside a boundary is positioned relative to it, so comparing a node in
+ * an availability zone with one outside it means adding the parents up first.
+ */
+export function absoluteBoxes(
+  nodes: KazeNode[],
+): Map<string, { x: number; y: number; width?: number; height?: number }> {
+  const byId = new Map(nodes.map((n) => [n.id, n]))
+  const boxes = new Map<string, { x: number; y: number; width?: number; height?: number }>()
+
+  const resolve = (node: KazeNode, seen: Set<string>): { x: number; y: number } => {
+    const cached = boxes.get(node.id)
+    if (cached) return cached
+    let origin = { x: 0, y: 0 }
+    // `seen` guards a parent cycle. It should not be possible; a stack overflow
+    // while drawing would be a poor way to find out that it was.
+    if (node.parentId && !seen.has(node.parentId)) {
+      const parent = byId.get(node.parentId)
+      if (parent) origin = resolve(parent, new Set([...seen, node.id]))
+    }
+    const box = {
+      x: origin.x + node.position.x,
+      y: origin.y + node.position.y,
+      width: node.measured?.width ?? (node.width as number | undefined),
+      height: node.measured?.height ?? (node.height as number | undefined),
+    }
+    boxes.set(node.id, box)
+    return box
+  }
+
+  for (const node of nodes) resolve(node, new Set())
+  return boxes
+}

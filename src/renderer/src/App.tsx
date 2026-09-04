@@ -46,6 +46,8 @@ import { LocaleProvider, useLocale } from './i18n/useLocale'
 import {
   DEFAULT_VIEW,
   flowEdgeType,
+  absoluteBoxes,
+  autoSides,
   edgeText,
   flipEdges,
   fromFlow,
@@ -119,11 +121,28 @@ function Canvas() {
   // `defaultEdgeOptions` only reaches edges created after the change, so the
   // type is applied at render time. Changing the setting should redraw the
   // diagram you already have, not just the next connection you make.
-  const drawnEdges = useMemo(
-    () =>
-      edges.map((e) => ({
+  const drawnEdges = useMemo(() => {
+    const boxes = absoluteBoxes(nodes)
+    return edges.map((e) => {
+      // Only where nobody chose: a connection you dragged keeps the sides you
+      // dragged it between. One the model added has no opinion about geometry,
+      // and letting React Flow use its default handle for all of them is why
+      // every line used to leave the top of one box and arrive at the top of
+      // another.
+      const from = boxes.get(e.source)
+      const to = boxes.get(e.target)
+      const sides = !e.sourceHandle && !e.targetHandle && from && to ? autoSides(from, to) : null
+      return {
         ...e,
+        ...(sides ?? {}),
         type: flowEdgeType(view.edgeStyle),
+        // The protocol sat directly on the line, in the gap between two boxes,
+        // where it was both unreadable and in the way. A chip lifts it off.
+        labelShowBg: true,
+        labelBgStyle: { fill: '#fff', fillOpacity: 0.94, stroke: '#e8eaed' },
+        labelBgPadding: [6, 3] as [number, number],
+        labelBgBorderRadius: 6,
+        labelStyle: { fill: '#5f6368', fontSize: 11 },
         // The arrow points at whoever receives the call. Direction is already
         // in the serialized design and the review already argues about it, so
         // leaving it invisible means reviewing a claim the user cannot see.
@@ -135,9 +154,11 @@ function Canvas() {
           // chosen here rather than inherited from the path.
           color: e.selected ? '#1a73e8' : '#9aa0a6',
         },
-      })),
-    [edges, view.edgeStyle],
-  )
+      }
+    })
+    // Recomputed as the boxes move: the sides are a consequence of the layout,
+    // so dragging a node reroutes what it is connected to.
+  }, [edges, nodes, view.edgeStyle])
   const serviceCount = nodes.filter((n) => n.type === 'service').length
 
   const markDirty = useCallback(() => setDirty(true), [])
