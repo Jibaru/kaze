@@ -11,7 +11,7 @@
     "dist": "npm run build && electron-builder",
     "typecheck": "tsc --noEmit",
     "spike": "node spike/run.mjs",
-    "check": "node scripts/check.mjs scripts/check-roundtrip.mts && node scripts/check.mjs scripts/check-adl.mts && node scripts/check.mjs scripts/check-revisions.mts && node scripts/check.mjs scripts/check-findings.mts && node scripts/check.mjs scripts/check-ledger.mts && node scripts/check.mjs scripts/check-author.mts && node scripts/check.mjs scripts/check-patch.mts && node scripts/check.mjs scripts/check-attempt.mts && node scripts/check.mjs scripts/check-fast.mts && node scripts/check.mjs scripts/check-conversation.mts",
+    "check": "node scripts/check.mjs scripts/check-roundtrip.mts && node scripts/check.mjs scripts/check-adl.mts && node scripts/check.mjs scripts/check-revisions.mts && node scripts/check.mjs scripts/check-findings.mts && node scripts/check.mjs scripts/check-ledger.mts && node scripts/check.mjs scripts/check-author.mts && node scripts/check.mjs scripts/check-patch.mts && node scripts/check.mjs scripts/check-attempt.mts && node scripts/check.mjs scripts/check-fast.mts && node scripts/check.mjs scripts/check-conversation.mts && node scripts/check.mjs scripts/check-concepts.mts",
     "check:live": "node scripts/check.mjs scripts/check-review.mts && node scripts/check.mjs scripts/check-loop.mts",
     "check:voice": "node scripts/check.mjs scripts/check-voice.mts"
   },

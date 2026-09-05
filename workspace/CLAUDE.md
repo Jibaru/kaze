@@ -8,6 +8,10 @@ This directory holds one system-design practice attempt.
 - `attempts/<id>/revisions/NNN-design.md` — every earlier version.
 - `attempts/<id>/findings.json` — the ledger of findings raised so far, and their
   status. Read it before every review.
+- `concepts/<id>.md` — lessons for study mode, each with a hidden **Checks**
+  section. Nothing to do with a review: the lesson runs in its own session with
+  no tools and never reads this file. Listed here so the directory is not a
+  mystery.
 
 ## How to read a design
 
