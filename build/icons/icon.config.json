@@ -1,0 +1,22 @@
+{
+  "text": null,
+  "svg": null,
+  "glyph": "M3 8h9a3 3 0 1 0-3-3M3 13h13M3 18h7",
+  "glyphBox": 24,
+  "out": ".",
+  "name": "Kaze",
+  "shortName": "Kaze",
+  "face": "serif-italic",
+  "bg": "#1a73e8",
+  "fg": "#ffffff",
+  "bgDark": "#1a73e8",
+  "fgDark": "#ffffff",
+  "radius": 6,
+  "scale": 0.58,
+  "padding": 3,
+  "stroke": null,
+  "recolor": true,
+  "darkRasters": false,
+  "svgOnly": false,
+  "themeColor": "#1a73e8"
+}
