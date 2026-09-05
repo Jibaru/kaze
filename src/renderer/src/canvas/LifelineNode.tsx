@@ -46,13 +46,23 @@ export function LifelineNode({ id, data, selected }: NodeProps & { data: Service
           why a slot never has two handles fighting for the pointer. */}
       <div className="lifeline__body" aria-hidden>
         {Array.from({ length: LIFELINE_SLOTS }, (_, i) => (
-          <Handle
-            key={i}
-            type="source"
-            id={`s${i + 1}`}
-            position={Position.Left}
-            style={{ top: SLOT_TOP + i * SLOT_GAP, left: '50%' }}
-          />
+          <span key={i}>
+            <Handle
+              type="source"
+              id={`s${i + 1}`}
+              position={Position.Left}
+              style={{ top: SLOT_TOP + i * SLOT_GAP, left: '50%' }}
+            />
+            {/* The outside edge, for a message from this lifeline to itself:
+                both ends are the same point on the line, so a self-call has to
+                leave the column and come back. */}
+            <Handle
+              type="source"
+              id={`o${i + 1}`}
+              position={Position.Right}
+              style={{ top: SLOT_TOP + i * SLOT_GAP }}
+            />
+          </span>
         ))}
       </div>
     </div>

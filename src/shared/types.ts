@@ -156,6 +156,22 @@ export interface Scenario {
   brief: string
 }
 
+/**
+ * A concept to study, as the learner sees it.
+ *
+ * The checks are stripped in the main process, the same way a scenario's rubric
+ * is: rehearsing the answers is not learning.
+ */
+export interface Concept {
+  id: string
+  title: string
+  service: string
+  difficulty: number
+  /** How many ideas the lesson works through. The app owns the count. */
+  steps: number
+  summary: string
+}
+
 /** Which key you held: a rubric pass, or an ordinary question. */
 export type TurnIntent = 'review' | 'ask'
 
@@ -276,6 +292,18 @@ export interface KazeApi {
   onChatAudio(handler: (audio: ChatAudio) => void): () => void
   /** Leaving the mode: lets go of the process it was holding open. */
   closeChat(): Promise<void>
+  listConcepts(): Promise<Concept[]>
+  /** Start a lesson: says what the concept is, draws nothing. */
+  openLesson(conceptId: string, diagram: Diagram, speed: number): Promise<ChatTurn>
+  /** One exchange in a lesson. `step` of `steps` is the app's count, not the model's. */
+  sayToLesson(
+    said: string,
+    refused: string[],
+    speed: number,
+    diagram: Diagram,
+    step: number,
+    steps: number,
+  ): Promise<ChatTurn>
   hasVoiceKey(): Promise<boolean>
   setVoiceKey(key: string): Promise<void>
   transcribe(audio: ArrayBuffer, mimeType: string): Promise<string>

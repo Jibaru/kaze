@@ -1786,3 +1786,38 @@ button, input, select { font-family: inherit; font-size: inherit; color: inherit
 @media (prefers-reduced-motion: reduce) {
   .lifeline .react-flow__handle { transition: none; }
 }
+
+/* Which lesson, and how far in. Above the caption, because it is context for
+   everything below it rather than part of the conversation. */
+.chatbar__lesson {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+.chatbar__lessonTitle {
+  font-weight: 500;
+  color: var(--ink);
+}
+.chatbar__lessonStep {
+  color: var(--grey-700);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The concept menu is a list of titles, not of commands, so its items stack a
+   name over what it costs you. */
+.menu--wide { min-width: 300px; }
+.menu__item--stacked {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding-block: 9px;
+}
+.menu__title { font-weight: 500; }
+.menu__meta { font-size: 12px; color: var(--grey-700); }

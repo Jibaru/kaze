@@ -34,6 +34,17 @@ const api: KazeApi = {
     return () => ipcRenderer.off('chat:audio', listener)
   },
   closeChat: () => ipcRenderer.invoke('chat:close'),
+  listConcepts: () => ipcRenderer.invoke('lesson:list'),
+  openLesson: (conceptId: string, diagram: Diagram, speed: number) =>
+    ipcRenderer.invoke('lesson:open', conceptId, diagram, speed),
+  sayToLesson: (
+    said: string,
+    refused: string[],
+    speed: number,
+    diagram: Diagram,
+    step: number,
+    steps: number,
+  ) => ipcRenderer.invoke('lesson:say', said, refused, speed, diagram, step, steps),
   hasVoiceKey: () => ipcRenderer.invoke('voice:has-key'),
   setVoiceKey: (key: string) => ipcRenderer.invoke('voice:set-key', key),
   transcribe: (audio: ArrayBuffer, mimeType: string) => ipcRenderer.invoke('voice:transcribe', audio, mimeType),

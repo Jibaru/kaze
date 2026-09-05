@@ -22,7 +22,8 @@ export type PatchOp =
   | { op: 'set_props'; node: string; props: NodeProps }
   /** Add a service. `as` names it for later operations in the same patch. */
   | { op: 'add_node'; service: string; label?: string; props?: NodeProps; near?: string; as?: string }
-  | { op: 'add_edge'; from: string; to: string; protocol?: string }
+  /** `step` numbers an ordered exchange; between lifelines it is also the row. */
+  | { op: 'add_edge'; from: string; to: string; protocol?: string; label?: string; step?: number }
   | { op: 'remove_edge'; from: string; to: string }
   | { op: 'set_protocol'; from: string; to: string; protocol: string }
   /** Move a node into a boundary, or out of every boundary with `null`. */
@@ -88,9 +89,14 @@ export function parsePatch(value: unknown, options: ParseOptions = {}): PatchOp[
 // two boxes rather than being squeezed onto the line.
 const CELL = { x: 340, y: 170 }
 const CLEAR = { x: 280, y: 110 }
+/** Lifelines sit in a row of their own, wide enough for a message label. */
+const LIFELINE_GAP = 340
+
+/** How much room a node needs under it. A lifeline needs its whole column. */
+const clearOf = (n: { serviceId?: string }): number => (n.serviceId === 'Lifeline' ? 460 : CLEAR.y)
 
 function placeNode(
-  taken: Array<{ x: number; y: number }>,
+  taken: Array<{ x: number; y: number; serviceId?: string }>,
   anchor: { x: number; y: number } | undefined,
   count: number,
 ): { x: number; y: number } {
@@ -99,7 +105,7 @@ function placeNode(
   // Bounded: a diagram dense enough to exhaust this is past the point where
   // another overlap is the problem.
   for (let i = 0; i < 40; i++) {
-    if (!taken.some((n) => Math.abs(n.x - x) < CLEAR.x && Math.abs(n.y - y) < CLEAR.y)) break
+    if (!taken.some((n) => Math.abs(n.x - x) < CLEAR.x && Math.abs(n.y - y) < clearOf(n))) break
     y += CELL.y
     if (i === 19) {
       x += CELL.x
@@ -211,7 +217,13 @@ export function applyPatch(
         ids.add(id)
         if (op.as) aliases.set(op.as, id)
         const { kept } = allowedProps(op.service, op.props ?? {})
-        const at = placeNode(nodes, anchor, nodes.length)
+        // A lifeline is a column: four hundred pixels tall, and only ever read
+        // against the ones beside it. It goes in a row along the top, never
+        // into the grid the boxes use, where the next row would land inside it.
+        const at =
+          op.service === 'Lifeline'
+            ? { x: 120 + nodes.filter((n) => n.serviceId === 'Lifeline').length * LIFELINE_GAP, y: 80 }
+            : placeNode(nodes, anchor, nodes.length)
         nodes.push({
           id,
           serviceId: op.service,
@@ -249,16 +261,33 @@ export function applyPatch(
           reject(`no such node: ${!from ? op.from : op.to}`)
           break
         }
-        if (from === to) {
+        // A self-loop on a component diagram is a modelling error and stays
+        // refused. A numbered message from a lifeline to itself is the runtime
+        // calling itself — an ordinary and necessary thing to draw, and the
+        // model reaches for it unprompted the first time it explains a cold
+        // start.
+        const selfMessage =
+          typeof op.step === 'number' && nodes.find((n) => n.id === from)?.serviceId === 'Lifeline'
+        if (from === to && !selfMessage) {
           reject('an edge from a node to itself')
           break
         }
-        if (edges.some((e) => e.from === from && e.to === to)) {
+        // A second connection between the same pair is a duplicate on a
+        // component diagram and an ordinary thing in a sequence, where two
+        // messages differ by their step. Refuse only what is actually the same.
+        if (edges.some((e) => e.from === from && e.to === to && e.step === op.step)) {
           reject(`${from} -> ${to} already exists`)
           break
         }
-        edges.push({ id: `e-${from}-${to}`, from, to, ...(op.protocol ? { protocol: op.protocol } : {}) })
-        applied.push(`+ ${from} -> ${to}`)
+        edges.push({
+          id: typeof op.step === 'number' ? `e-${from}-${to}-${op.step}` : `e-${from}-${to}`,
+          from,
+          to,
+          ...(op.protocol ? { protocol: op.protocol } : {}),
+          ...(op.label ? { label: op.label } : {}),
+          ...(typeof op.step === 'number' ? { step: op.step } : {}),
+        })
+        applied.push(`+ ${from} -> ${to}${typeof op.step === 'number' ? ` (${op.step})` : ''}`)
         break
       }
 

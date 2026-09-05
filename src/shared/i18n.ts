@@ -139,6 +139,11 @@ export interface Dict {
   review: string
   reviewing: string
   thinking: string
+  study: string
+  studyHint: string
+  studyEmpty: string
+  studySteps: (n: number) => string
+  studyStep: (n: number, of: number) => string
   chatMode: string
   chatModeHint: string
   chatState: Record<string, string>
@@ -325,6 +330,11 @@ const es: Dict = {
   review: 'Revisar',
   reviewing: 'Revisando…',
   thinking: 'Pensando…',
+  study: 'Estudiar',
+  studyHint: 'Lección guiada: te explica un concepto dibujándolo, y te pregunta.',
+  studyEmpty: 'No hay conceptos en tu workspace todavía.',
+  studySteps: (n) => `${n} ideas`,
+  studyStep: (n, of) => `paso ${n} de ${of}`,
   chatMode: 'Conversar',
   chatModeHint:
     'Modo conversación: solo el diagrama, micrófono abierto. Le dices qué añadir y lo dibuja. Sales cuando quieras.',
@@ -641,6 +651,11 @@ const en: Dict = {
   review: 'Review',
   reviewing: 'Reviewing…',
   thinking: 'Thinking…',
+  study: 'Study',
+  studyHint: 'A guided lesson: it explains a concept by drawing it, and asks you about it.',
+  studyEmpty: 'No concepts in your workspace yet.',
+  studySteps: (n) => `${n} ideas`,
+  studyStep: (n, of) => `step ${n} of ${of}`,
   chatMode: 'Converse',
   chatModeHint:
     'Conversation mode: the diagram and nothing else, microphone open. Tell it what to add and it draws. Leave whenever you like.',

@@ -256,12 +256,22 @@ export const LIFELINE_SLOTS = 8
  * Derived for drawing and never saved, like the sides everywhere else: renumber
  * a step and the message moves.
  */
-export const stepHandles = (step: number): { sourceHandle: string; targetHandle: string } => {
+export const stepHandles = (
+  step: number,
+  self = false,
+): { sourceHandle: string; targetHandle: string } => {
   const slot = Math.min(LIFELINE_SLOTS, Math.max(1, Math.round(step)))
-  // The same slot at both ends: the message is a horizontal line at that row,
-  // and which lifeline is to the left is a fact about the layout, not about
-  // the message.
-  return { sourceHandle: `s${slot}`, targetHandle: `s${slot}` }
+  // A message to another lifeline uses the same slot at both ends: it is a
+  // horizontal line at that row, and which participant is to the left is a
+  // fact about the layout rather than about the message.
+  if (!self) return { sourceHandle: `s${slot}`, targetHandle: `s${slot}` }
+  // A message to itself leaves one row and returns on the next, from the
+  // outside edge — which is the bracket a self-call is always drawn as, and
+  // the only way to draw one at all when both ends are the same point.
+  return {
+    sourceHandle: `o${slot}`,
+    targetHandle: `o${Math.min(LIFELINE_SLOTS, slot + 1)}`,
+  }
 }
 
 /**

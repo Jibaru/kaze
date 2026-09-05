@@ -26,6 +26,7 @@ export function ConversationBar({
   say,
   heard,
   note,
+  lesson,
   listening,
   signal,
   inputs,
@@ -53,6 +54,8 @@ export function ConversationBar({
   /** Whatever went wrong with the microphone. Shown here because the status
    *  bar this used to use is not on screen in this mode. */
   note: string
+  /** Set when the mode is a lesson rather than a design conversation. */
+  lesson: { title: string; step: number; steps: number } | null
   /** The detector is actually running, as opposed to the chip merely saying so. */
   listening: boolean
   /** The chosen microphone is delivering something. False means a dead input. */
@@ -85,6 +88,16 @@ export function ConversationBar({
 
   return (
     <div className="chatbar">
+      {/* Which lesson, and how far in. The count is the app's — the concept
+          file says how many ideas there are — so it means the same thing every
+          time rather than tracking the model's sense of progress. */}
+      {lesson && (
+        <p className="chatbar__lesson">
+          <span className="chatbar__lessonTitle">{lesson.title}</span>
+          <span className="chatbar__lessonStep">{t.studyStep(lesson.step, lesson.steps)}</span>
+        </p>
+      )}
+
       <div className="chatbar__captions">
         {/* The failure this app could not see. A microphone that is open and
             delivering silence looks exactly like a quiet room from in here,

@@ -1,7 +1,7 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Locale } from '../shared/i18n'
-import type { Scenario } from '../shared/types'
+import type { Concept, Scenario } from '../shared/types'
 
 const RUBRIC = /<!--\s*RUBRIC:START[\s\S]*?RUBRIC:END\s*-->/g
 /** Localized briefs live in the same file as the rubric, so they cannot drift
@@ -109,6 +109,69 @@ export async function readScenarioSource(
     id: meta.id ?? id,
     title: meta.title ?? id,
     difficulty: Number(meta.difficulty ?? 1),
+    text,
+  }
+}
+
+const CHECKS = /<!--\s*CHECKS:START[\s\S]*?CHECKS:END\s*-->/g
+
+/**
+ * The concept bank.
+ *
+ * Concepts are to lessons what scenarios are to reviews, down to the hidden
+ * half: a scenario hides its rubric so you cannot design to it, and a concept
+ * hides its checks so you cannot rehearse the answers. Both are stripped here,
+ * in the main process, before anything reaches the renderer.
+ */
+export async function listConcepts(root: string, locale: Locale = 'en'): Promise<Concept[]> {
+  let files: string[]
+  try {
+    files = (await readdir(join(root, 'concepts'))).filter((f) => f.endsWith('.md'))
+  } catch {
+    return []
+  }
+
+  const concepts = await Promise.all(
+    files.map(async (file) => {
+      const raw = (await readFile(join(root, 'concepts', file), 'utf-8')).replace(/\r\n/g, '\n')
+      const id = file.replace(/\.md$/, '')
+      const frontmatter = /^---\n([\s\S]*?)\n---\n/.exec(raw)
+      const meta = frontmatter ? parseFrontmatter(frontmatter[1]!) : {}
+      const body = (frontmatter ? raw.slice(frontmatter[0].length) : raw).replace(CHECKS, '').trim()
+      return {
+        id: meta.id ?? id,
+        title: meta[`title_${locale}`] ?? meta.title ?? id,
+        service: meta.service ?? '',
+        difficulty: Number(meta.difficulty ?? 1),
+        steps: Number(meta.steps ?? 5),
+        summary: body,
+      }
+    }),
+  )
+
+  return concepts.sort((a, b) => a.difficulty - b.difficulty || a.title.localeCompare(b.title))
+}
+
+/** The whole concept, checks included. Main-process only, like the rubric. */
+export async function readConceptSource(
+  root: string,
+  id: string,
+): Promise<{ title: string; service: string; steps: number; text: string } | null> {
+  let raw: string
+  try {
+    raw = (await readFile(join(root, 'concepts', `${id}.md`), 'utf-8')).replace(/\r\n/g, '\n')
+  } catch {
+    return null
+  }
+  const frontmatter = /^---\n([\s\S]*?)\n---\n/.exec(raw)
+  const meta = frontmatter ? parseFrontmatter(frontmatter[1]!) : {}
+  const text = (frontmatter ? raw.slice(frontmatter[0].length) : raw)
+    .replace(/<!--\s*CHECKS:(?:START|END)[^>]*-->/g, '')
+    .trim()
+  return {
+    title: meta.title ?? id,
+    service: meta.service ?? '',
+    steps: Number(meta.steps ?? 5),
     text,
   }
 }

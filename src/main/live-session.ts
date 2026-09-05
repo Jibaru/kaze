@@ -80,7 +80,7 @@ export interface LiveSessionOptions {
 }
 
 export class LiveSession {
-  private readonly options: LiveSessionOptions
+  private options: LiveSessionOptions
   private input: Pushable<SDKUserMessage> | null = null
   private stream: Query | null = null
   private pump: Promise<void> | null = null
@@ -98,6 +98,16 @@ export class LiveSession {
 
   get open(): boolean {
     return this.stream !== null
+  }
+
+  /**
+   * Change what this session is for. Takes effect on the next process, which is
+   * why the caller closes first: a system prompt is chosen when the CLI starts,
+   * and swapping one mid-conversation would leave a transcript that reads as
+   * neither job.
+   */
+  setSystem(system: string): void {
+    this.options = { ...this.options, system }
   }
 
   /**

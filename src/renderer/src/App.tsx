@@ -17,7 +17,7 @@ import {
   type NodeTypes,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import type { ChatTurn, GroupKind, NodeProps as ConfigProps, ReviewOutcome, Scenario, TurnIntent } from '@shared/types'
+import type { ChatTurn, Concept, GroupKind, NodeProps as ConfigProps, ReviewOutcome, Scenario, TurnIntent } from '@shared/types'
 import type { ReviewProblem } from '@shared/findings'
 import type { LedgerEntry } from '@shared/ledger'
 import { LOCALE_NAMES, LOCALES, type Locale } from '@shared/i18n'
@@ -33,6 +33,7 @@ import { ScenarioPanel } from './scenario/ScenarioPanel'
 import { Inspector } from './inspector/Inspector'
 import { EdgeInspector } from './inspector/EdgeInspector'
 import { ConversationBar, type ChatState } from './conversation/ConversationBar'
+import { LessonMenu } from './conversation/LessonMenu'
 import { useVoiceLoop } from './voice/useVoiceLoop'
 import { useStreamedSpeech } from './voice/useStreamedSpeech'
 import { useAudioInputs } from './voice/useAudioInputs'
@@ -107,6 +108,14 @@ function Canvas() {
    * diagram is what you keep.
    */
   const [chat, setChat] = useState<{ say: string; busy: boolean; refused: string[] } | null>(null)
+  /**
+   * The lesson in progress, when the mode is a lesson rather than a design
+   * conversation. `step` is the app's count, not the model's: the concept file
+   * says how many ideas there are, the same way a scenario says what it is
+   * graded against.
+   */
+  const [lesson, setLesson] = useState<{ id: string; title: string; step: number; steps: number } | null>(null)
+  const [concepts, setConcepts] = useState<Concept[]>([])
   const [muted, setMuted] = useState(false)
   /**
    * Whatever went wrong with the microphone, shown *in the mode*. It used to go
@@ -120,6 +129,8 @@ function Canvas() {
   /** Read inside a callback that must not re-register on every turn. */
   const chatRef = useRef(chat)
   chatRef.current = chat
+  const lessonRef = useRef(lesson)
+  lessonRef.current = lesson
   const [keyDraft, setKeyDraft] = useState('')
   const [dirty, setDirty] = useState(false)
   const wrapper = useRef<HTMLDivElement>(null)
@@ -151,7 +162,7 @@ function Canvas() {
       // vertical position is the order. Everything else attaches by geometry.
       const ordered = !chosen && step !== undefined && lifelines.has(e.source) && lifelines.has(e.target)
       const sides = ordered
-        ? stepHandles(step!)
+        ? stepHandles(step!, e.source === e.target)
         : !chosen && from && to
           ? autoSides(from, to)
           : null
@@ -612,9 +623,24 @@ function Canvas() {
   const chatSaid = useCallback(
     (said: string) => {
       const refused = chatRef.current?.refused ?? []
+      const active = lessonRef.current
       setChat((c) => (c ? { ...c, busy: true } : c))
-      window.kaze
-        .sayToChat(said, refused, speechRate.rate, diagramRef.current)
+      // A lesson counts its own steps. Advancing on every exchange would count
+      // "no sé" as progress, so it only moves when the model moves on — which
+      // the app cannot see. This counts turns, which is honest about being an
+      // approximation and is what the model is told.
+      if (active) setLesson((l) => (l ? { ...l, step: Math.min(l.steps, l.step + 1) } : l))
+      const sending = active
+        ? window.kaze.sayToLesson(
+            said,
+            refused,
+            speechRate.rate,
+            diagramRef.current,
+            Math.min(active.steps, active.step + 1),
+            active.steps,
+          )
+        : window.kaze.sayToChat(said, refused, speechRate.rate, diagramRef.current)
+      sending
         .then(landChatTurn)
         .catch((err: Error) => {
           setStatus(err.message)
@@ -684,8 +710,34 @@ function Canvas() {
   const exitChat = useCallback(() => {
     chatSpeech.stop()
     setChat(null)
+    setLesson(null)
     void window.kaze.closeChat()
   }, [chatSpeech])
+
+  const startLesson = useCallback(
+    async (concept: Concept) => {
+      if (!hasVoiceKey) {
+        setStatus(t.chatNoKey)
+        return
+      }
+      setMuted(false)
+      setChatNote('')
+      setLesson({ id: concept.id, title: concept.title, step: 1, steps: concept.steps })
+      setChat({ say: '', busy: true, refused: [] })
+      try {
+        landChatTurn(await window.kaze.openLesson(concept.id, diagramRef.current, speechRate.rate))
+      } catch (err) {
+        setStatus(err instanceof Error ? err.message : String(err))
+        setChat(null)
+        setLesson(null)
+      }
+    },
+    [hasVoiceKey, landChatTurn, speechRate.rate, t],
+  )
+
+  useEffect(() => {
+    void window.kaze.listConcepts().then(setConcepts)
+  }, [locale])
 
   // The device is let go when the mode closes. A microphone light that stays on
   // after you left is a promise the app has broken.
@@ -914,6 +966,7 @@ function Canvas() {
           level={loop.level}
           say={chat.say}
           heard={loop.heard}
+          lesson={lesson}
           note={chatNote}
           listening={loop.state !== 'off'}
           signal={loop.signal}
@@ -953,6 +1006,7 @@ function Canvas() {
         <button className="btn btn--ghost" onClick={() => void enterChat()} disabled={streaming} title={t.chatModeHint}>
           {t.chatMode}
         </button>
+        <LessonMenu concepts={concepts} onStart={(c) => void startLesson(c)} disabled={streaming} />
         <button
           className={`btn btn--ghost fasttoggle${fast ? ' fasttoggle--on' : ''}`}
           onClick={toggleFast}

@@ -6,8 +6,9 @@ import { WorkspaceStore } from './workspace-store'
 import { FAST_DISALLOWED, SessionManager } from './session-manager'
 import { LiveSession } from './live-session'
 import { VoiceService } from './voice-service'
-import { listScenarios, readScenarioSource } from './scenarios'
+import { listConcepts, listScenarios, readConceptSource, readScenarioSource } from './scenarios'
 import { authorPrompt, parseAuthored, writeScenario } from './scenario-author'
+import { LESSON_SYSTEM, lessonOpening, lessonTurn } from './lesson'
 import {
   CONVERSATION_SYSTEM,
   conversationOpening,
@@ -131,6 +132,11 @@ async function scaffoldWorkspace(): Promise<void> {
     recursive: true,
     force: true,
   })
+
+  const concepts = join(templateRoot, 'concepts')
+  if (existsSync(concepts)) {
+    await cp(concepts, join(workspaceRoot, 'concepts'), { recursive: true, force: true })
+  }
 
   const references = join(templateRoot, 'references')
   if (existsSync(references)) {
@@ -455,8 +461,24 @@ async function speakInto(text: string, seq: number, speed: number): Promise<void
   }
 }
 
-async function chatTurn(prompt: string, fresh: boolean, speed: number): Promise<ChatTurn> {
-  if (fresh) live.close()
+/**
+ * Which conversation the live process is holding.
+ *
+ * One process, two very different jobs: a design conversation and a lesson.
+ * They have different system prompts, so switching between them has to start a
+ * new one rather than resume into a transcript that reads as neither.
+ */
+let liveMode: 'chat' | 'lesson' | null = null
+
+async function chatTurn(
+  prompt: string,
+  fresh: boolean,
+  speed: number,
+  mode: 'chat' | 'lesson' = 'chat',
+): Promise<ChatTurn> {
+  if (fresh || liveMode !== mode) live.close()
+  liveMode = mode
+  live.setSystem(mode === 'lesson' ? LESSON_SYSTEM : CONVERSATION_SYSTEM)
   const seq = ++chatAudioSeq
   let spoken: Promise<void> | null = null
   const speak = (text: string) => {
@@ -517,7 +539,47 @@ ipcMain.handle(
 
 // Leaving the mode lets the process go. Holding a CLI open for a conversation
 // nobody is having is the kind of thing you only notice in Task Manager.
-ipcMain.handle('chat:close', () => live.close())
+ipcMain.handle('chat:close', () => {
+  liveMode = null
+  live.close()
+})
+
+// ── study mode ───────────────────────────────────────────────────────────
+ipcMain.handle('lesson:list', () => listConcepts(workspaceRoot, currentLocale()))
+
+ipcMain.handle(
+  'lesson:open',
+  async (_e, conceptId: string, diagram: Diagram, speed: number): Promise<ChatTurn> => {
+    await store.saveDiagram(diagram, ATTEMPT)
+    return chatTurn(
+      lessonOpening({
+        concept: await readConceptSource(workspaceRoot, conceptId),
+        conceptId,
+        diagram,
+        locale: currentLocale(),
+      }),
+      true,
+      speed,
+      'lesson',
+    )
+  },
+)
+
+ipcMain.handle(
+  'lesson:say',
+  async (
+    _e,
+    said: string,
+    refused: string[],
+    speed: number,
+    diagram: Diagram,
+    step: number,
+    steps: number,
+  ): Promise<ChatTurn> => {
+    await store.saveDiagram(diagram, ATTEMPT)
+    return chatTurn(lessonTurn(said, refused, diagram, step, steps), false, speed, 'lesson')
+  },
+)
 
 /**
  * Everything a fast turn would otherwise have opened a file to read. Assembled

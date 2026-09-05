@@ -20,6 +20,7 @@ import {
 } from '../src/main/conversation.ts'
 import { applyPatch, parsePatch } from '../src/shared/patch.ts'
 import { clampSpeed, SPEECH_RATES } from '../src/shared/openai-audio.ts'
+import { LESSON_SYSTEM, lessonOpening, lessonTurn } from '../src/main/lesson.ts'
 import type { Diagram } from '../src/shared/types.ts'
 
 const checks: Array<[string, boolean, string?]> = []
@@ -168,6 +169,29 @@ try {
   check('a node placed near another does not land on top of it',
     !near.diagram.nodes.some((n) => n.id !== added.id && n.x === added.x && n.y === added.y))
 
+  // ── the lesson ─────────────────────────────────────────────────────────
+  const concept = { title: 'Lambda', service: 'Lambda', steps: 6, text: 'CONCEPT-BODY' }
+  const open = lessonOpening({ concept, conceptId: 'lambda', diagram: empty, locale: 'es' })
+  check('the opening carries the concept', open.includes('CONCEPT-BODY'))
+  check('and the step count, which the app owns', open.includes('Step 1 of 6'))
+  check('and draws nothing: it asks what they already know first',
+    open.includes('Draw nothing yet'))
+  check('a missing concept is admitted rather than invented',
+    lessonOpening({ concept: null, conceptId: 'nope', diagram: empty, locale: 'es' })
+      .includes('nothing on file'))
+  check('their existing work is not silently cleared',
+    lessonOpening({ concept, conceptId: 'lambda', diagram: started, locale: 'es' })
+      .includes('Do not clear it without saying so'))
+
+  const mid = lessonTurn('no sé', [], started, 3, 6)
+  check('a turn says where the lesson is', mid.includes('Step 3 of 6'))
+  check('and carries the canvas, so the ids are real', mid.includes('n1'))
+  check('and refuses to move on for an answer that is only words',
+    mid.includes('the mechanism, not the words'))
+  const last = lessonTurn('ya', [], started, 6, 6)
+  check('the last step is told to close rather than open another idea',
+    last.includes('last step') && last.includes('lesson is done'))
+
   // ── the contract ───────────────────────────────────────────────────────
   check('the system prompt asks for speech first and operations after',
     CONVERSATION_SYSTEM.indexOf('read aloud') < CONVERSATION_SYSTEM.indexOf('fenced json array'))
@@ -180,6 +204,69 @@ try {
     CONVERSATION_SYSTEM.includes('Never mention operations, json, ids'))
   check('every operation it is shown is one the app actually accepts',
     [...CONVERSATION_SYSTEM.matchAll(/"op":\s*"([a-z_]+)"/g)].every(
+      (m) => parsePatch([{ op: m[1]! }], { allowRemoveNode: true }).length === 1,
+    ))
+
+  // ── drawing what happens, not only what exists ────────────────────────
+  // A sequence is the one thing a box diagram cannot say, and the lesson
+  // reaches for it the first time it explains a runtime.
+  const lifelines: Diagram = {
+    ...empty,
+    nodes: [
+      { id: 'n1', serviceId: 'Lifeline', label: 'cliente', props: {}, x: 0, y: 0 },
+      { id: 'n2', serviceId: 'Lifeline', label: 'entorno', props: {}, x: 300, y: 0 },
+      { id: 'n3', serviceId: 'Lambda', label: 'fn', props: {}, x: 600, y: 0 },
+    ],
+  }
+  const messages = applyPatch(
+    lifelines,
+    parsePatch([
+      { op: 'add_edge', from: 'n1', to: 'n2', step: 1, label: 'invoca' },
+      { op: 'add_edge', from: 'n2', to: 'n2', step: 2, label: 'init del runtime' },
+      { op: 'add_edge', from: 'n1', to: 'n2', step: 3, label: 'segunda llamada' },
+    ]),
+  )
+  check('an ordered message carries its step', messages.diagram.edges[0]?.step === 1)
+  check('a lifeline may message itself: that is a runtime calling itself',
+    messages.diagram.edges.some((e) => e.from === 'n2' && e.to === 'n2' && e.step === 2),
+    messages.rejected.map((r) => r.reason).join('; '))
+  check('two messages between the same pair are not duplicates: they differ by step',
+    messages.diagram.edges.filter((e) => e.from === 'n1' && e.to === 'n2').length === 2)
+  check('and they get distinct ids, or one would replace the other',
+    new Set(messages.diagram.edges.map((e) => e.id)).size === messages.diagram.edges.length)
+  check('a service still may not connect to itself',
+    applyPatch(lifelines, parsePatch([{ op: 'add_edge', from: 'n3', to: 'n3', step: 1 }])).rejected.length === 1)
+  check('nor may a lifeline, without a step to place the message on',
+    applyPatch(lifelines, parsePatch([{ op: 'add_edge', from: 'n2', to: 'n2' }])).rejected.length === 1)
+
+  // Lifelines are columns four hundred pixels tall. Placed on the grid the
+  // boxes use, the next row lands inside the one above it.
+  const drawn = applyPatch(
+    empty,
+    parsePatch([
+      { op: 'add_node', service: 'Lifeline', label: 'cliente' },
+      { op: 'add_node', service: 'Lifeline', label: 'servicio' },
+      { op: 'add_node', service: 'Lifeline', label: 'entorno' },
+    ]),
+  )
+  const columns = drawn.diagram.nodes
+  check('lifelines are placed in a row, not on the grid the boxes use',
+    columns.every((n) => n.y === columns[0]!.y), JSON.stringify(columns.map((n) => `${n.x},${n.y}`)))
+  check('and spread far enough apart for a message label to fit between them',
+    columns[1]!.x - columns[0]!.x >= 300)
+  const mixed = applyPatch(drawn.diagram, parsePatch([{ op: 'add_node', service: 'Lambda', label: 'fn' }]))
+  const box = mixed.diagram.nodes.find((n) => n.serviceId === 'Lambda')!
+  check('a box is not dropped inside the column a lifeline occupies',
+    !columns.some((c) => Math.abs(c.x - box.x) < 280 && Math.abs(c.y - box.y) < 460),
+    `${box.x},${box.y}`)
+
+  check('the lesson is told to draw time with lifelines and steps',
+    LESSON_SYSTEM.includes('lifelines and numbered steps'))
+  check('and not to accept the words back',
+    LESSON_SYSTEM.includes('Do not accept the words back'))
+  check('and to ask, then wait', LESSON_SYSTEM.includes('Ask, then wait'))
+  check('every operation the lesson is shown is one the app accepts',
+    [...LESSON_SYSTEM.matchAll(/"op":\s*"([a-z_]+)"/g)].every(
       (m) => parsePatch([{ op: m[1]! }], { allowRemoveNode: true }).length === 1,
     ))
 
