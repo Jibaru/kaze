@@ -1676,3 +1676,113 @@ button, input, select { font-family: inherit; font-size: inherit; color: inherit
   min-width: 62px;
   font-variant-numeric: tabular-nums;
 }
+
+/* ── sequence lifelines ───────────────────────────────────────────────
+   A header with a long dashed line under it. The messages attach down
+   that line, one row per step, which is what makes the vertical position
+   mean something — see `LifelineNode`. */
+.lifeline {
+  width: 176px;
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.lifeline__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+  padding: 8px 10px;
+  /* Fixed, so every participant's slots line up. Let one header wrap to two
+     lines and its rows sit lower than the others', and every message across it
+     is drawn on a slope. A sequence diagram is a row of equal boxes for
+     exactly this reason. */
+  height: 54px;
+  box-sizing: border-box;
+  background: var(--surface);
+  border: 1px solid var(--border-control);
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgb(60 64 67 / 20%);
+}
+.lifeline--selected .lifeline__head {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-tint);
+}
+.lifeline__body {
+  position: relative;
+  flex: 1;
+  width: 100%;
+}
+/* The line itself is a border, so the handles can sit on top of it without
+   fighting a background for the pointer. */
+.lifeline .node__label {
+  white-space: normal;
+  line-height: 1.2;
+  /* Two lines inside the fixed header, then an ellipsis: a name you cannot
+     read is worse than a name you cannot read all of. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.lifeline .node__service {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lifeline__body::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 8px;
+  border-left: 2px dashed var(--grey-500);
+}
+
+/* A lane is a phase of an explanation, not a piece of AWS topology, so it is
+   drawn as a plain field rather than borrowing an infrastructure boundary's
+   look. */
+.group--lane {
+  border-style: solid;
+  border-color: var(--border);
+  background: rgb(241 243 244 / 55%);
+}
+
+/* A note: the label at full length, on paper rather than in a card. */
+.note {
+  max-width: 260px;
+  padding: 10px 14px;
+  background: #fef7e0;
+  border: 1px solid #f2d888;
+  border-radius: 4px 4px 4px 12px;
+  box-shadow: 0 1px 2px rgb(60 64 67 / 20%);
+}
+.note--selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-tint);
+}
+.note__text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  /* #5f6368 on #fef7e0 measures 6.09:1. */
+  color: var(--grey-700);
+  white-space: pre-wrap;
+}
+
+/* Sixteen visible attachment points drown the line they sit on. Service nodes
+   show theirs — they have four and you reach for them constantly — but a
+   lifeline's appear when you go looking for them. */
+.lifeline .react-flow__handle {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.lifeline:hover .react-flow__handle,
+.lifeline--selected .react-flow__handle {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lifeline .react-flow__handle { transition: none; }
+}

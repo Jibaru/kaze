@@ -98,6 +98,8 @@ export interface Dict {
   protocolHint: string
   edgeLabel: string
   edgeLabelPlaceholder: string
+  edgeStep: string
+  edgeStepPlaceholder: string
   mixedValues: string
   deleteConnection: string
   deleteConnections: (n: number) => string
@@ -284,6 +286,8 @@ const es: Dict = {
   protocolHint: 'Una conexión sin protocolo aparece como omisión en el texto del diseño.',
   edgeLabel: 'Nota',
   edgeLabelPlaceholder: 'lo que viaja por aquí',
+  edgeStep: 'Paso',
+  edgeStepPlaceholder: 'orden en la secuencia',
   mixedValues: '— varios —',
   deleteConnection: 'Eliminar conexión',
   deleteConnections: (n) => `Eliminar ${n} conexiones`,
@@ -449,8 +453,16 @@ const es: Dict = {
     Security: 'Seguridad',
     Observability: 'Observabilidad',
     Other: 'Otros',
+    Notation: 'Notas y pasos',
+    Sequence: 'Secuencia',
+    C4: 'C4',
   },
   prop: {
+    text: 'Texto',
+    role: 'Rol',
+    technology: 'Tecnología',
+    purpose: 'Para qué sirve',
+    external: 'Es externo',
     channel: 'Canal',
     scale: 'Volumen',
     kind: '¿Qué es?',
@@ -590,6 +602,8 @@ const en: Dict = {
   protocolHint: 'A connection with no protocol shows up as a gap in the design text.',
   edgeLabel: 'Note',
   edgeLabelPlaceholder: 'what travels along it',
+  edgeStep: 'Step',
+  edgeStepPlaceholder: 'order in the sequence',
   mixedValues: '— mixed —',
   deleteConnection: 'Delete connection',
   deleteConnections: (n) => `Delete ${n} connections`,
@@ -752,8 +766,16 @@ const en: Dict = {
     Security: 'Security',
     Observability: 'Observability',
     Other: 'Other',
+    Notation: 'Notes and steps',
+    Sequence: 'Sequence',
+    C4: 'C4',
   },
   prop: {
+    text: 'Text',
+    role: 'Role',
+    technology: 'Technology',
+    purpose: 'What it is for',
+    external: 'External',
     channel: 'Channel',
     scale: 'Volume',
     kind: 'What is it?',

@@ -167,6 +167,41 @@ if (process.argv.includes('--print')) {
   console.log(serialize(fixed, { revision: 2, diff }))
 }
 
+// ── notation is not part of the design ────────────────────────────────────
+// A note explains a diagram; a lifeline draws when things happen. Running the
+// gap rules over them would open every review by complaining that the
+// annotations are unconnected and untyped.
+const annotated: Diagram = {
+  version: 1,
+  scenarioId: 'x',
+  groups: [],
+  nodes: [
+    { id: 'n1', serviceId: 'Lambda', label: 'api', props: {}, x: 0, y: 0 },
+    { id: 'n2', serviceId: 'Note', label: 'arranque en frío 400 ms', props: {}, x: 300, y: 0 },
+    { id: 'n3', serviceId: 'Lifeline', label: 'cliente', props: {}, x: 600, y: 0 },
+  ],
+  edges: [{ id: 'e1', from: 'n2', to: 'n1' }],
+}
+const annotatedGaps = computeGaps(annotated)
+check('a note with no connections is not an unconnected component',
+  !annotatedGaps.some((g) => g.refs.includes('n2')), JSON.stringify(annotatedGaps.map((g) => g.rule + ':' + g.refs)))
+check('nor is a lifeline', !annotatedGaps.some((g) => g.refs.includes('n3')))
+check('a line to a note is not an untyped connection',
+  !annotatedGaps.some((g) => g.rule === 'untyped_edge'))
+// And a box wired only to a note is still an unconnected box: the note points
+// at it, it does not connect it to anything.
+check('a service connected only to a note is still unconnected',
+  annotatedGaps.some((g) => g.rule === 'unconnected_node' && g.refs.includes('n1')),
+  JSON.stringify(annotatedGaps.map((g) => `${g.rule}:${g.refs}`)))
+
+// The step is part of the design text: an ordered exchange is a claim about
+// what happens when, and the reviewer has to be able to argue with the order.
+const ordered = serialize({
+  ...annotated,
+  edges: [{ id: 'e1', from: 'n1', to: 'n3', step: 2, protocol: 'HTTPS' }],
+})
+check('a numbered message serializes its step', ordered.includes('step: 2'), ordered)
+
 for (const [name, pass, detail] of checks) {
   console.log(`${pass ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}`)
 }

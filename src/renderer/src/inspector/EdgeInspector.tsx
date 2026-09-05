@@ -46,7 +46,7 @@ export function EdgeInspector({
 }: {
   /** Every selected connection. Never empty — the caller decides that. */
   edges: KazeEdge[]
-  onChange: (ids: string[], patch: { protocol?: string; label?: string }) => void
+  onChange: (ids: string[], patch: { protocol?: string; label?: string; step?: number }) => void
   onDelete: (ids: string[]) => void
 }) {
   const t = useT()
@@ -63,6 +63,7 @@ export function EdgeInspector({
 
   const protocol = (e: KazeEdge) => e.data?.protocol ?? ''
   const label = (e: KazeEdge) => e.data?.label ?? ''
+  const step = (e: KazeEdge) => (e.data?.step === undefined ? '' : String(e.data.step))
 
   return (
     <div className="inspector">
@@ -103,6 +104,23 @@ export function EdgeInspector({
           value={shared(label)}
           placeholder={mixed(label) ? t.mixedValues : t.edgeLabelPlaceholder}
           onChange={(e) => onChange(ids, { label: e.target.value })}
+        />
+      </label>
+
+      {/* Between two lifelines the number is also the row the message sits on,
+          so renumbering moves it. Everywhere else it is just a label. */}
+      <label className="field">
+        <span>{t.edgeStep}</span>
+        <input
+          type="number"
+          min={1}
+          max={99}
+          value={shared(step)}
+          placeholder={mixed(step) ? t.mixedValues : t.edgeStepPlaceholder}
+          onChange={(e) => {
+            const raw = e.target.value.trim()
+            onChange(ids, { step: raw === '' ? undefined : Number(raw) })
+          }}
         />
       </label>
 

@@ -14,6 +14,12 @@ export type PropSpec =
 
 export type Category =
   | 'Actors'
+  /** Not part of the system: notes and step markers that explain it. */
+  | 'Notation'
+  /** Lifelines, for drawing what happens in what order. */
+  | 'Sequence'
+  /** C4 levels, for the structure above the services. */
+  | 'C4'
   | 'Compute'
   | 'Containers'
   | 'Storage'
@@ -47,9 +53,21 @@ export interface ServiceFlags {
    * service. Drawing one inside a VPC is a modelling mistake, not a choice.
    */
   external?: boolean
+  /**
+   * Explains the diagram rather than being part of it: a note, a lifeline.
+   *
+   * Excluded from every gap rule. A note with no connections is a note, not an
+   * unconnected component, and a review that opens by complaining about the
+   * annotations is a review nobody reads.
+   */
+  annotation?: boolean
 }
 
-export type GroupKind = 'account' | 'region' | 'vpc' | 'az' | 'subnet'
+/**
+ * `lane` is not an AWS boundary — it is a phase, a step, a swimlane. It exists
+ * because explaining a system means grouping by *when* as often as by *where*.
+ */
+export type GroupKind = 'account' | 'region' | 'vpc' | 'az' | 'subnet' | 'lane'
 
 export type NodeProps = Record<string, string | boolean>
 
@@ -81,6 +99,15 @@ export interface DiagramEdge {
   to: string
   protocol?: string
   label?: string
+  /**
+   * Position in an ordered exchange, drawn as a numbered badge.
+   *
+   * On a pair of lifelines it is also the vertical slot the message attaches
+   * to, which is what turns a row of boxes into a sequence diagram: the app
+   * derives the handles from it, the same way it derives the sides from the
+   * layout everywhere else.
+   */
+  step?: number
   /**
    * Which side of each node the line attaches to. Presentation, like
    * `edgeStyle`: saved so the drawing survives a reload, and never serialized

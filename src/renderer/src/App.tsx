@@ -24,6 +24,8 @@ import { LOCALE_NAMES, LOCALES, type Locale } from '@shared/i18n'
 import { emptyDiagram, type Diagram } from '@shared/types'
 import { getService, type ServiceSpec } from '@shared/services'
 import { ServiceNode } from './canvas/ServiceNode'
+import { LifelineNode } from './canvas/LifelineNode'
+import { NoteNode } from './canvas/NoteNode'
 import { GroupNode } from './canvas/GroupNode'
 import { CanvasOptions } from './canvas/CanvasOptions'
 import { Palette } from './palette/Palette'
@@ -49,6 +51,8 @@ import {
   flowEdgeType,
   absoluteBoxes,
   autoSides,
+  nodeKindFor,
+  stepHandles,
   edgeText,
   flipEdges,
   fromFlow,
@@ -62,9 +66,16 @@ import {
   type ViewOptions,
 } from './diagram-model'
 
-const nodeTypes: NodeTypes = { service: ServiceNode as never, group: GroupNode as never }
+const nodeTypes: NodeTypes = {
+  service: ServiceNode as never,
+  lifeline: LifelineNode as never,
+  note: NoteNode as never,
+  group: GroupNode as never,
+}
 
-const GROUP_KINDS: GroupKind[] = ['vpc', 'az', 'subnet', 'region', 'account']
+// `lane` last: it is not an AWS boundary but a phase of an explanation, and it
+// belongs with the others because on the canvas it does the same job.
+const GROUP_KINDS: GroupKind[] = ['vpc', 'az', 'subnet', 'region', 'account', 'lane']
 
 /** Assistant text arrives as deltas either side of a tool call; without this
  *  they run together into one wall of prose. */
@@ -125,6 +136,7 @@ function Canvas() {
   // diagram you already have, not just the next connection you make.
   const drawnEdges = useMemo(() => {
     const boxes = absoluteBoxes(nodes)
+    const lifelines = new Set(nodes.filter((n) => n.type === 'lifeline').map((n) => n.id))
     return edges.map((e) => {
       // Only where nobody chose: a connection you dragged keeps the sides you
       // dragged it between. One the model added has no opinion about geometry,
@@ -133,7 +145,16 @@ function Canvas() {
       // another.
       const from = boxes.get(e.source)
       const to = boxes.get(e.target)
-      const sides = !e.sourceHandle && !e.targetHandle && from && to ? autoSides(from, to) : null
+      const chosen = Boolean(e.sourceHandle || e.targetHandle)
+      const step = e.data?.step
+      // A numbered message between two lifelines attaches by its number, so the
+      // vertical position is the order. Everything else attaches by geometry.
+      const ordered = !chosen && step !== undefined && lifelines.has(e.source) && lifelines.has(e.target)
+      const sides = ordered
+        ? stepHandles(step!)
+        : !chosen && from && to
+          ? autoSides(from, to)
+          : null
       return {
         ...e,
         ...(sides ?? {}),
@@ -171,7 +192,7 @@ function Canvas() {
         const id = nextNodeId(current)
         const node: KazeNode = {
           id,
-          type: 'service',
+          type: nodeKindFor(spec.id),
           position: position ?? { x: 220 + (current.length % 5) * 200, y: 120 + Math.floor(current.length / 5) * 140 },
           data: { serviceId: spec.id, label: spec.name, props: {} },
         }
@@ -402,13 +423,16 @@ function Canvas() {
    * note draws both rather than quietly showing one.
    */
   const setEdgeText = useCallback(
-    (ids: string[], patch: { protocol?: string; label?: string }) => {
+    (ids: string[], patch: { protocol?: string; label?: string; step?: number }) => {
       const set = new Set(ids)
       setEdges((es) =>
         es.map((e) => {
           if (!set.has(e.id)) return e
           const data = { ...e.data, ...patch }
-          return { ...e, data, label: edgeText(data.protocol, data.label) }
+          // `step: undefined` must clear it, and spreading leaves the key
+          // present with an undefined value — which `!== undefined` reads
+          // correctly, but `in` would not.
+          return { ...e, data, label: edgeText(data.protocol, data.label, data.step) }
         }),
       )
       markDirty()

@@ -85,8 +85,16 @@ const describe = (node: DiagramNode): string => {
 
 export function computeGaps(diagram: Diagram): Gap[] {
   const gaps: Gap[] = []
+  const annotations = new Set(
+    diagram.nodes.filter((n) => getService(n.serviceId)?.flags?.annotation).map((n) => n.id),
+  )
+  /** A line to a note points at a box. It does not connect it to anything. */
+  const explains = (e: { from: string; to: string }): boolean =>
+    annotations.has(e.from) || annotations.has(e.to)
+
   const degree = new Map<string, number>()
   for (const e of diagram.edges) {
+    if (explains(e)) continue
     degree.set(e.from, (degree.get(e.from) ?? 0) + 1)
     degree.set(e.to, (degree.get(e.to) ?? 0) + 1)
   }
@@ -94,6 +102,11 @@ export function computeGaps(diagram: Diagram): Gap[] {
   for (const node of diagram.nodes) {
     const spec = getService(node.serviceId)
     const flags = spec?.flags ?? {}
+
+    // Notes and lifelines explain the diagram; they are not in it. A review
+    // that opens by complaining that a note has no connections is a review
+    // nobody reads twice.
+    if (flags.annotation) continue
 
     if ((degree.get(node.id) ?? 0) === 0) {
       gaps.push({
@@ -158,7 +171,9 @@ export function computeGaps(diagram: Diagram): Gap[] {
 
   const nodeIds = new Set(diagram.nodes.map((n) => n.id))
   for (const edge of diagram.edges) {
-    if (!isSet(edge.protocol ?? '')) {
+    // Nor does it carry a protocol: asking for one would be asking about the
+    // annotation rather than about the design.
+    if (!explains(edge) && !isSet(edge.protocol ?? '')) {
       gaps.push({
         rule: 'untyped_edge',
         subject: `${edge.from} -> ${edge.to}`,
@@ -326,6 +341,7 @@ export function serialize(diagram: Diagram, options: SerializeOptions = {}): str
         ['from', e.from],
         ['to', e.to],
       ]
+      if (e.step !== undefined) entries.push(['step', e.step])
       if (e.protocol) entries.push(['protocol', e.protocol])
       if (e.label) entries.push(['label', e.label])
       out.push(`  - ${inlineMap(entries)}`)

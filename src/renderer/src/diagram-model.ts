@@ -10,24 +10,42 @@ import type { BackgroundStyle, Diagram, DiagramNode, EdgeStyle, GroupKind, NodeP
 export type ServiceNodeData = { serviceId: string; label: string; props: NodeProps }
 export type GroupNodeData = { kind: GroupKind; label: string }
 
-export type KazeNode = Node<ServiceNodeData, 'service'> | Node<GroupNodeData, 'group'>
-export type KazeEdge = Edge<{ protocol?: string; label?: string }>
+export type KazeNode =
+  | Node<ServiceNodeData, 'service'>
+  | Node<ServiceNodeData, 'lifeline'>
+  | Node<ServiceNodeData, 'note'>
+  | Node<GroupNodeData, 'group'>
+
+/**
+ * Which renderer a node gets. Driven by the manifest rather than stored on the
+ * node, so the save format stays a save format: a lifeline is a service id like
+ * any other, and what it looks like is the app's business.
+ */
+export const nodeKindFor = (serviceId: string): 'service' | 'lifeline' | 'note' =>
+  serviceId === 'Lifeline' ? 'lifeline' : serviceId === 'Note' ? 'note' : 'service'
+export type KazeEdge = Edge<{ protocol?: string; label?: string; step?: number }>
 
 /**
  * What a connection says on the canvas.
  *
- * Two fields rather than one because they are read by different readers.
+ * Three fields rather than one because they are read by different readers.
  * `protocol` is the one the app has an opinion about: an edge without one
  * raises the `untyped_edge` gap, and it is serialized as a key the reviewer can
  * argue with. `label` is yours — "cache miss", "async", "solo lectura" — and
  * the reviewer only sees it as prose.
  *
- * They are shown together because a connection carrying both and drawing only
- * one is a connection that lies about what you typed.
+ * `step` is the position in an ordered exchange, and leads: in a sequence it is
+ * the first thing you read.
+ *
+ * They are shown together because a connection carrying all three and drawing
+ * only one is a connection that lies about what you typed.
  */
-export const edgeText = (protocol?: string, label?: string): string | undefined => {
-  const parts = [protocol?.trim(), label?.trim()].filter(Boolean)
-  return parts.length ? parts.join(' · ') : undefined
+export const edgeText = (protocol?: string, label?: string, step?: number): string | undefined => {
+  const body = [protocol?.trim(), label?.trim()].filter(Boolean).join(' · ')
+  if (step === undefined) return body || undefined
+  // The number leads: in an ordered exchange it is the first thing you read,
+  // and a step with nothing else to say still needs to be numbered.
+  return body ? `${step}. ${body}` : `${step}.`
 }
 
 export const GROUP_DEFAULT_SIZE = { width: 420, height: 300 }
@@ -64,7 +82,7 @@ export function toFlow(diagram: Diagram): { nodes: KazeNode[]; edges: KazeEdge[]
 
   const nodes: KazeNode[] = diagram.nodes.map((n) => ({
     id: n.id,
-    type: 'service',
+    type: nodeKindFor(n.serviceId),
     position: { x: n.x, y: n.y },
     data: { serviceId: n.serviceId, label: n.label, props: n.props },
     ...(n.parentId ? { parentId: n.parentId, extent: 'parent' as const } : {}),
@@ -76,10 +94,11 @@ export function toFlow(diagram: Diagram): { nodes: KazeNode[]; edges: KazeEdge[]
     source: e.from,
     target: e.to,
     type,
-    label: edgeText(e.protocol, e.label),
+    label: edgeText(e.protocol, e.label, e.step),
     data: {
       ...(e.protocol ? { protocol: e.protocol } : {}),
       ...(e.label ? { label: e.label } : {}),
+      ...(e.step !== undefined ? { step: e.step } : {}),
     },
     ...(e.fromHandle ? { sourceHandle: e.fromHandle } : {}),
     ...(e.toHandle ? { targetHandle: e.toHandle } : {}),
@@ -135,6 +154,7 @@ export function fromFlow(
       to: e.target,
       ...(e.data?.protocol ? { protocol: e.data.protocol } : {}),
       ...(e.data?.label ? { label: e.data.label } : {}),
+      ...(e.data?.step !== undefined ? { step: e.data.step } : {}),
       ...(e.sourceHandle ? { fromHandle: e.sourceHandle } : {}),
       ...(e.targetHandle ? { toHandle: e.targetHandle } : {}),
     })),
@@ -220,6 +240,28 @@ export function autoSides(
   return dy >= 0
     ? { sourceHandle: 'bottom', targetHandle: 'top' }
     : { sourceHandle: 'top', targetHandle: 'bottom' }
+}
+
+/** How many message slots a lifeline offers down its length. */
+export const LIFELINE_SLOTS = 8
+
+/**
+ * The handles an ordered message attaches to.
+ *
+ * This is what turns a row of boxes into a sequence diagram. A lifeline is tall
+ * and carries a handle per step down each side, so `step: 3` means "the third
+ * row", and the vertical position *is* the order — which is the one thing a
+ * box-and-arrow diagram cannot say and the reason sequence diagrams exist.
+ *
+ * Derived for drawing and never saved, like the sides everywhere else: renumber
+ * a step and the message moves.
+ */
+export const stepHandles = (step: number): { sourceHandle: string; targetHandle: string } => {
+  const slot = Math.min(LIFELINE_SLOTS, Math.max(1, Math.round(step)))
+  // The same slot at both ends: the message is a horizontal line at that row,
+  // and which lifeline is to the left is a fact about the layout, not about
+  // the message.
+  return { sourceHandle: `s${slot}`, targetHandle: `s${slot}` }
 }
 
 /**

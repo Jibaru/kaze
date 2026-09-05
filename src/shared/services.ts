@@ -295,6 +295,64 @@ export const SERVICES: ServiceSpec[] = [
     reviewProps: [{ key: 'alarms', kind: 'text' }],
   },
 
+  // ── Explaining the diagram, rather than being in it ─────────────────────
+  {
+    // A note is how you say the thing a box cannot: "aquí el arranque en frío
+    // añade 400 ms". `annotation` keeps it out of every gap rule — a note with
+    // no connections is a note, not an unconnected component.
+    id: 'Note',
+    name: 'Nota',
+    category: 'Notation',
+    aliases: ['note', 'nota', 'texto', 'comentario', 'anotacion', 'anotación', 'label', 'callout'],
+    // No properties: the label is the note, shown at full length on the canvas.
+    // A note whose text lives in a form field is a note truncated to one line.
+    flags: { annotation: true },
+  },
+  {
+    // A column in a sequence diagram. Tall on purpose: the messages attach
+    // down its length, and the vertical position is the order.
+    id: 'Lifeline',
+    name: 'Línea de vida',
+    category: 'Sequence',
+    aliases: ['lifeline', 'linea de vida', 'línea de vida', 'secuencia', 'sequence', 'actor uml', 'participante'],
+    flags: { annotation: true },
+    reviewProps: [{ key: 'role', kind: 'text' }],
+  },
+
+  // ── C4, for the structure above the services ───────────────────────────
+  // Level 1's person is the Actor above; drawing the same idea twice would
+  // only make you choose between them.
+  {
+    id: 'C4System',
+    name: 'Sistema',
+    category: 'C4',
+    aliases: ['system', 'sistema', 'c4', 'software system', 'sistema externo'],
+    reviewProps: [
+      { key: 'external', kind: 'bool' },
+      { key: 'purpose', kind: 'text' },
+    ],
+  },
+  {
+    id: 'C4Container',
+    name: 'Contenedor',
+    category: 'C4',
+    aliases: ['container', 'contenedor', 'c4', 'aplicacion', 'aplicación', 'servicio', 'api'],
+    reviewProps: [
+      { key: 'technology', kind: 'text' },
+      { key: 'purpose', kind: 'text' },
+    ],
+  },
+  {
+    id: 'C4Component',
+    name: 'Componente',
+    category: 'C4',
+    aliases: ['component', 'componente', 'c4', 'modulo', 'módulo', 'clase'],
+    reviewProps: [
+      { key: 'technology', kind: 'text' },
+      { key: 'purpose', kind: 'text' },
+    ],
+  },
+
   // ── Anything the manifest does not know ────────────────────────────────
   {
     // The escape hatch. A design is not wrong for containing something this
@@ -330,6 +388,11 @@ export const CATEGORIES: Category[] = [
   'Security',
   'Observability',
   'Other',
+  // Last, and in this order: you reach for these to explain a diagram, which
+  // happens after you have drawn one.
+  'Notation',
+  'Sequence',
+  'C4',
 ]
 
 /**
